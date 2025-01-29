@@ -2,13 +2,32 @@ from enum import Enum
 import random
 from envs import EXAMPLE_ENV
 import numpy as np
+import copy
 
 
 class RobotActionSpace(Enum):
-    NORTH = (-1, 0)
-    EAST = (0, 1)
-    SOUTH = (1, 0)
-    WEST = (0, -1)
+    NORTH = 0
+    EAST = 1
+    SOUTH = 2
+    WEST = 3
+
+
+_action_space_to_tuple_dict: dict = {
+    RobotActionSpace.NORTH: (-1, 0),
+    RobotActionSpace.EAST: (0, 1),
+    RobotActionSpace.SOUTH: (1, 0),
+    RobotActionSpace.WEST: (0, -1),
+
+    RobotActionSpace.NORTH.value: (-1, 0),
+    RobotActionSpace.EAST.value: (0, 1),
+    RobotActionSpace.SOUTH.value: (1, 0),
+    RobotActionSpace.WEST.value: (0, -1)
+}
+
+def _action_space_to_tuple(x: int) -> tuple:
+    return _action_space_to_tuple_dict[x]
+
+_action_space_to_tuple_vec = np.vectorize(_action_space_to_tuple)
 
 
 class GridTile(Enum):
@@ -37,20 +56,20 @@ class GridEnv:
 
     def move(self, action: RobotActionSpace) -> bool:
         new_robot_pos: tuple = tuple(
-            a + b for a, b in zip(self.robot_pos, action.value)
+            a + b for a, b in zip(self.robot_pos, _action_space_to_tuple_vec(action))
         )
         if (
             self._is_in_bounds(new_robot_pos)
-            and self.env_space[new_robot_pos] == GridTile.FLOOR
+            and self.env_space[new_robot_pos] != GridTile.WALL
         ):
-            self.env_space[new_robot_pos] = GridTile.ROBOT
             self.env_space[self.robot_pos] = GridTile.FLOOR
+            self.env_space[new_robot_pos] = GridTile.ROBOT
             self.robot_pos = new_robot_pos
             return True
         return False
 
     def reset(self) -> None:
-        self.env_space = self.env_orig
+        self.env_space = copy.deepcopy(self.env_orig)
         self.robot_pos = self._find_item(GridTile.ROBOT)
         self.target_pos = self._find_item(GridTile.TARGET)
 
