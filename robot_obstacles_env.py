@@ -35,9 +35,7 @@ class RobotObstacleEnv(gym.Env):
                 ),
                 "agent": gym.spaces.Box(
                     low=np.array([0, 0]),
-                    high=np.array(
-                        [self.robot_grid_env.size, self.robot_grid_env.size]
-                    ),
+                    high=np.array([self.robot_grid_env.size, self.robot_grid_env.size]),
                     shape=(2,),
                     dtype=np.uint8,
                 ),

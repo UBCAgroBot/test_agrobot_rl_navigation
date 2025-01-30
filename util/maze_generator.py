@@ -68,14 +68,12 @@ def _maze_generator_attempt(
                 ],
                 False,
             )
-            if min_indx + 1 != min_dist:
-                continue
 
             if all(
                 maze[curx + i * nx][cury + i * ny] == GridTile.WALL.value
-                for i in range(min_dist)
+                for i in range(min_indx)
             ):
-                valid_dirs.append({"mndist": min_dist, "coords": (nx, ny)})
+                valid_dirs.append({"mndist": min_indx, "coords": (nx, ny)})
 
         random.shuffle(valid_dirs)
         for dir in valid_dirs:
