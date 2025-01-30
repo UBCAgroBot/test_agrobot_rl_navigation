@@ -8,13 +8,27 @@ authors = [
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
-    "numpy (>=2.2.2,<3.0.0)",
-    "stable-baselines3 (>=2.5.0,<3.0.0)",
+    "gymnasium[all] (>=1.0.0,<2.0.0)",
+    "stable-baselines3[extra] (>=2.5.0,<3.0.0)",
     "torch (>=2.6.0,<3.0.0)",
-    "gymnasium (>=1.0.0,<2.0.0)"
+    "torchvision (>=0.21.0,<0.22.0)",
+    "torchaudio (>=2.6.0,<3.0.0)"
 ]
-
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[[tool.poetry.source]]
+name = "pytorch-gpu"
+url = "https://download.pytorch.org/whl/cu126"
+priority = "explicit"
+
+
+[tool.poetry.dependencies]
+torch = {source = "pytorch-gpu"}
+torchvision = {source = "pytorch-gpu"}
+torchaudio = {source = "pytorch-gpu"}
+
+[tool.poetry]
+package-mode = false

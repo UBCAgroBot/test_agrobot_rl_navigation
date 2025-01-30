@@ -18,8 +18,8 @@ gym.register(
 class RobotObstacleEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 1}
 
-    def __init__(self, discount=0.99995, render_mode=None) -> None:
-        self.robot_grid_env = GridEnv(size=14)
+    def __init__(self, discount=0.9995, render_mode=None) -> None:
+        self.robot_grid_env = GridEnv(size=6)
         self.render_mode = render_mode
         self.steps: int = 0
         self.discount: float = discount
