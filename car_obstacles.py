@@ -42,7 +42,7 @@ SCALE = 6.0  # Track scale
 TRACK_RAD = 900 / SCALE  # Track is heavily morphed circle with this radius
 PLAYFIELD = 2000 / SCALE  # Game over boundary
 FPS = 50  # Frames per second
-ZOOM = 2.7  # Camera zoom
+ZOOM = 0.7  # Camera zoom
 ZOOM_FOLLOW = True  # Set to False for fixed view (don't use zoom)
 
 
@@ -58,10 +58,9 @@ MAX_SHAPE_DIM = (
 
 
 class FrictionDetector(contactListener):
-    def __init__(self, env, lap_complete_percent):
+    def __init__(self, env):
         contactListener.__init__(self)
         self.env = env
-        self.lap_complete_percent = lap_complete_percent
 
     def BeginContact(self, contact):
         self._contact(contact, True)
@@ -94,106 +93,13 @@ class FrictionDetector(contactListener):
                 self.env.reward += 1000.0 / len(self.env.track)
                 self.env.tile_visited_count += 1
 
-                # Lap is considered completed if enough % of the track was covered
-                if (
-                    tile.idx == 0
-                    and self.env.tile_visited_count / len(self.env.track)
-                    > self.lap_complete_percent
-                ):
-                    self.env.new_lap = True
+                print("ENV COMPLETE")
         else:
             obj.tiles.remove(tile)
 
 
 class CarRacing(gym.Env, EzPickle):
     """
-    ## Description
-    The easiest control task to learn from pixels - a top-down
-    racing environment. The generated track is random every episode.
-
-    Some indicators are shown at the bottom of the window along with the
-    state RGB buffer. From left to right: true speed, four ABS sensors,
-    steering wheel position, and gyroscope.
-    To play yourself (it's rather fast for humans), type:
-    ```shell
-    python gymnasium/envs/box2d/car_racing.py
-    ```
-    Remember: it's a powerful rear-wheel drive car - don't press the accelerator
-    and turn at the same time.
-
-    ## Action Space
-    If continuous there are 3 actions :
-    - 0: steering, -1 is full left, +1 is full right
-    - 1: gas
-    - 2: braking
-
-    If discrete there are 5 actions:
-    - 0: do nothing
-    - 1: steer left
-    - 2: steer right
-    - 3: gas
-    - 4: brake
-
-    ## Observation Space
-
-    A top-down 96x96 RGB image of the car and race track.
-
-    ## Rewards
-    The reward is -0.1 every frame and +1000/N for every track tile visited, where N is the total number of tiles
-     visited in the track. For example, if you have finished in 732 frames, your reward is 1000 - 0.1*732 = 926.8 points.
-
-    ## Starting State
-    The car starts at rest in the center of the road.
-
-    ## Episode Termination
-    The episode finishes when all the tiles are visited. The car can also go outside the playfield -
-     that is, far off the track, in which case it will receive -100 reward and die.
-
-    ## Arguments
-
-    ```python
-    >>> import gymnasium as gym
-    >>> env = gym.make("CarRacing-v3", render_mode="rgb_array", lap_complete_percent=0.95, domain_randomize=False, continuous=False)
-    >>> env
-    <TimeLimit<OrderEnforcing<PassiveEnvChecker<CarRacing<CarRacing-v3>>>>>
-
-    ```
-
-    * `lap_complete_percent=0.95` dictates the percentage of tiles that must be visited by
-     the agent before a lap is considered complete.
-
-    * `domain_randomize=False` enables the domain randomized variant of the environment.
-     In this scenario, the background and track colours are different on every reset.
-
-    * `continuous=True` converts the environment to use discrete action space.
-     The discrete action space has 5 actions: [do nothing, left, right, gas, brake].
-
-    ## Reset Arguments
-
-    Passing the option `options["randomize"] = True` will change the current colour of the environment on demand.
-    Correspondingly, passing the option `options["randomize"] = False` will not change the current colour of the environment.
-    `domain_randomize` must be `True` on init for this argument to work.
-
-    ```python
-    >>> import gymnasium as gym
-    >>> env = gym.make("CarRacing-v3", domain_randomize=True)
-
-    # normal reset, this changes the colour scheme by default
-    >>> obs, _ = env.reset()
-
-    # reset with colour scheme change
-    >>> randomize_obs, _ = env.reset(options={"randomize": True})
-
-    # reset with no colour scheme change
-    >>> non_random_obs, _ = env.reset(options={"randomize": False})
-
-    ```
-
-    ## Version History
-    - v2: Change truncation to termination when finishing the lap (1.0.0)
-    - v1: Change track completion logic and add domain randomization (0.24.0)
-    - v0: Original version
-
     ## References
     - Chris Campbell (2014), http://www.iforce2d.net/b2dtut/top-down-car.
 
@@ -231,7 +137,7 @@ class CarRacing(gym.Env, EzPickle):
         self.lap_complete_percent = lap_complete_percent
         self._init_colors()
 
-        self.contactListener_keepref = FrictionDetector(self, self.lap_complete_percent)
+        self.contactListener_keepref = FrictionDetector(self)
         self.world = Box2D.b2World((0, 0), contactListener=self.contactListener_keepref)
         self.screen: Optional[pygame.Surface] = None
         self.surf = None
@@ -306,196 +212,6 @@ class CarRacing(gym.Env, EzPickle):
             idx = self.np_random.integers(3)
             self.grass_color[idx] += 20
 
-    def _create_track(self):
-        CHECKPOINTS = 12
-
-        # Create checkpoints
-        checkpoints = []
-        for c in range(CHECKPOINTS):
-            noise = self.np_random.uniform(0, 2 * math.pi * 1 / CHECKPOINTS)
-            alpha = 2 * math.pi * c / CHECKPOINTS + noise
-            rad = self.np_random.uniform(TRACK_RAD / 3, TRACK_RAD)
-
-            if c == 0:
-                alpha = 0
-                rad = 1.5 * TRACK_RAD
-            if c == CHECKPOINTS - 1:
-                alpha = 2 * math.pi * c / CHECKPOINTS
-                self.start_alpha = 2 * math.pi * (-0.5) / CHECKPOINTS
-                rad = 1.5 * TRACK_RAD
-
-            checkpoints.append((alpha, rad * math.cos(alpha), rad * math.sin(alpha)))
-        self.road = []
-
-        # Go from one checkpoint to another to create track
-        x, y, beta = 1.5 * TRACK_RAD, 0, 0
-        dest_i = 0
-        laps = 0
-        track = []
-        no_freeze = 2500
-        visited_other_side = False
-        while True:
-            alpha = math.atan2(y, x)
-            if visited_other_side and alpha > 0:
-                laps += 1
-                visited_other_side = False
-            if alpha < 0:
-                visited_other_side = True
-                alpha += 2 * math.pi
-
-            while True:  # Find destination from checkpoints
-                failed = True
-
-                while True:
-                    dest_alpha, dest_x, dest_y = checkpoints[dest_i % len(checkpoints)]
-                    if alpha <= dest_alpha:
-                        failed = False
-                        break
-                    dest_i += 1
-                    if dest_i % len(checkpoints) == 0:
-                        break
-
-                if not failed:
-                    break
-
-                alpha -= 2 * math.pi
-                continue
-
-            r1x = math.cos(beta)
-            r1y = math.sin(beta)
-            p1x = -r1y
-            p1y = r1x
-            dest_dx = dest_x - x  # vector towards destination
-            dest_dy = dest_y - y
-            # destination vector projected on rad:
-            proj = r1x * dest_dx + r1y * dest_dy
-            while beta - alpha > 1.5 * math.pi:
-                beta -= 2 * math.pi
-            while beta - alpha < -1.5 * math.pi:
-                beta += 2 * math.pi
-            prev_beta = beta
-            proj *= SCALE
-            if proj > 0.3:
-                beta -= min(TRACK_TURN_RATE, abs(0.001 * proj))
-            if proj < -0.3:
-                beta += min(TRACK_TURN_RATE, abs(0.001 * proj))
-            x += p1x * TRACK_DETAIL_STEP
-            y += p1y * TRACK_DETAIL_STEP
-            track.append((alpha, prev_beta * 0.5 + beta * 0.5, x, y))
-            if laps > 4:
-                break
-            no_freeze -= 1
-            if no_freeze == 0:
-                break
-
-        # Find closed loop range i1..i2, first loop should be ignored, second is OK
-        i1, i2 = -1, -1
-        i = len(track)
-        while True:
-            i -= 1
-            if i == 0:
-                return False  # Failed
-            pass_through_start = (
-                track[i][0] > self.start_alpha and track[i - 1][0] <= self.start_alpha
-            )
-            if pass_through_start and i2 == -1:
-                i2 = i
-            elif pass_through_start and i1 == -1:
-                i1 = i
-                break
-        if self.verbose:
-            print("Track generation: %i..%i -> %i-tiles track" % (i1, i2, i2 - i1))
-        assert i1 != -1
-        assert i2 != -1
-
-        track = track[i1 : i2 - 1]
-
-        first_beta = track[0][1]
-        first_perp_x = math.cos(first_beta)
-        first_perp_y = math.sin(first_beta)
-        # Length of perpendicular jump to put together head and tail
-        well_glued_together = np.sqrt(
-            np.square(first_perp_x * (track[0][2] - track[-1][2]))
-            + np.square(first_perp_y * (track[0][3] - track[-1][3]))
-        )
-        if well_glued_together > TRACK_DETAIL_STEP:
-            return False
-
-        # Red-white border on hard turns
-        border = [False] * len(track)
-        for i in range(len(track)):
-            good = True
-            oneside = 0
-            for neg in range(BORDER_MIN_COUNT):
-                beta1 = track[i - neg - 0][1]
-                beta2 = track[i - neg - 1][1]
-                good &= abs(beta1 - beta2) > TRACK_TURN_RATE * 0.2
-                oneside += np.sign(beta1 - beta2)
-            good &= abs(oneside) == BORDER_MIN_COUNT
-            border[i] = good
-        for i in range(len(track)):
-            for neg in range(BORDER_MIN_COUNT):
-                border[i - neg] |= border[i]
-
-        # Create tiles
-        for i in range(len(track)):
-            alpha1, beta1, x1, y1 = track[i]
-            alpha2, beta2, x2, y2 = track[i - 1]
-            road1_l = (
-                x1 - TRACK_WIDTH * math.cos(beta1),
-                y1 - TRACK_WIDTH * math.sin(beta1),
-            )
-            road1_r = (
-                x1 + TRACK_WIDTH * math.cos(beta1),
-                y1 + TRACK_WIDTH * math.sin(beta1),
-            )
-            road2_l = (
-                x2 - TRACK_WIDTH * math.cos(beta2),
-                y2 - TRACK_WIDTH * math.sin(beta2),
-            )
-            road2_r = (
-                x2 + TRACK_WIDTH * math.cos(beta2),
-                y2 + TRACK_WIDTH * math.sin(beta2),
-            )
-            vertices = [road1_l, road1_r, road2_r, road2_l]
-            self.fd_tile.shape.vertices = vertices
-            t = self.world.CreateStaticBody(fixtures=self.fd_tile)
-            t.userData = t
-            c = 0.01 * (i % 3) * 255
-            t.color = self.road_color + c
-            t.road_visited = False
-            t.road_friction = 1.0
-            t.idx = i
-            t.fixtures[0].sensor = True
-            self.road_poly.append(([road1_l, road1_r, road2_r, road2_l], t.color))
-            self.road.append(t)
-            if border[i]:
-                side = np.sign(beta2 - beta1)
-                b1_l = (
-                    x1 + side * TRACK_WIDTH * math.cos(beta1),
-                    y1 + side * TRACK_WIDTH * math.sin(beta1),
-                )
-                b1_r = (
-                    x1 + side * (TRACK_WIDTH + BORDER) * math.cos(beta1),
-                    y1 + side * (TRACK_WIDTH + BORDER) * math.sin(beta1),
-                )
-                b2_l = (
-                    x2 + side * TRACK_WIDTH * math.cos(beta2),
-                    y2 + side * TRACK_WIDTH * math.sin(beta2),
-                )
-                b2_r = (
-                    x2 + side * (TRACK_WIDTH + BORDER) * math.cos(beta2),
-                    y2 + side * (TRACK_WIDTH + BORDER) * math.sin(beta2),
-                )
-                self.road_poly.append(
-                    (
-                        [b1_l, b1_r, b2_r, b2_l],
-                        (255, 255, 255) if i % 2 == 0 else (255, 0, 0),
-                    )
-                )
-        self.track = track
-        return True
-
     def reset(
         self,
         *,
@@ -505,7 +221,7 @@ class CarRacing(gym.Env, EzPickle):
         super().reset(seed=seed)
         self._destroy()
         self.world.contactListener_bug_workaround = FrictionDetector(
-            self, self.lap_complete_percent
+            self
         )
         self.world.contactListener = self.world.contactListener_bug_workaround
         self.reward = 0.0
@@ -513,7 +229,19 @@ class CarRacing(gym.Env, EzPickle):
         self.tile_visited_count = 0
         self.t = 0.0
         self.new_lap = False
-        self.road_poly = []
+
+        vertices = [(50, 50), (60, 50), (60, 60), (50, 60)]
+        self.road_poly = [(vertices, self.road_color)]
+        self.road = []
+        self.fd_tile.shape.vertices = vertices
+        t = self.world.CreateStaticBody(fixtures=self.fd_tile)
+        t.userData = t
+        t.color = self.road_color
+        t.road_visited = False
+        t.road_friction = 1.0
+        t.idx = 0
+        t.fixtures[0].sensor = True
+        self.road.append(t)
 
         if self.domain_randomize:
             randomize = True
@@ -523,15 +251,7 @@ class CarRacing(gym.Env, EzPickle):
 
             self._reinit_colors(randomize)
 
-        while True:
-            success = self._create_track()
-            if success:
-                break
-            if self.verbose:
-                print(
-                    "retry to generate track (normal if there are not many"
-                    "instances of this message)"
-                )
+        self.track = [(0, 0, 0, 0)]
         self.car = Car(self.world, *self.track[0][1:4])
 
         if self.render_mode == "human":
@@ -672,23 +392,6 @@ class CarRacing(gym.Env, EzPickle):
         self._draw_colored_polygon(
             self.surf, field, self.bg_color, zoom, translation, angle, clip=False
         )
-
-        # draw grass patches
-        grass = []
-        for x in range(-20, 20, 2):
-            for y in range(-20, 20, 2):
-                grass.append(
-                    [
-                        (GRASS_DIM * x + GRASS_DIM, GRASS_DIM * y + 0),
-                        (GRASS_DIM * x + 0, GRASS_DIM * y + 0),
-                        (GRASS_DIM * x + 0, GRASS_DIM * y + GRASS_DIM),
-                        (GRASS_DIM * x + GRASS_DIM, GRASS_DIM * y + GRASS_DIM),
-                    ]
-                )
-        for poly in grass:
-            self._draw_colored_polygon(
-                self.surf, poly, self.grass_color, zoom, translation, angle
-            )
 
         # draw road
         for poly, color in self.road_poly:

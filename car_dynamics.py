@@ -62,24 +62,28 @@ class Car:
                         vertices=[(x * SIZE, y * SIZE) for x, y in HULL_POLY1]
                     ),
                     density=1.0,
+                    isSensor=False,
                 ),
                 fixtureDef(
                     shape=polygonShape(
                         vertices=[(x * SIZE, y * SIZE) for x, y in HULL_POLY2]
                     ),
                     density=1.0,
+                    isSensor=False,
                 ),
                 fixtureDef(
                     shape=polygonShape(
                         vertices=[(x * SIZE, y * SIZE) for x, y in HULL_POLY3]
                     ),
                     density=1.0,
+                    isSensor=False,
                 ),
                 fixtureDef(
                     shape=polygonShape(
                         vertices=[(x * SIZE, y * SIZE) for x, y in HULL_POLY4]
                     ),
                     density=1.0,
+                    isSensor=False,
                 ),
             ],
         )

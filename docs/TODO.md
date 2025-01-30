@@ -24,3 +24,8 @@ for environment, bulid up step by step:
 - **init** function
 
 - step 2: modify the reward function
+
+- need to know/ understand
+- examples of how box2d contact listener, fixturedef, and polygon shape work
+- how something is drawn, and how to add contact listeners on top of that
+- how to trigger code when contact listener is triggered

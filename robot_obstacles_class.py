@@ -21,8 +21,7 @@ class GridEnv:
 
     def move(self, action: int) -> bool:
         new_robot_pos: tuple = tuple(
-            a + b
-            for a, b in zip(self.robot_pos, _action_space_to_tuple_vec(action))
+            a + b for a, b in zip(self.robot_pos, _action_space_to_tuple_vec(action))
         )
         if (
             self._is_in_bounds(new_robot_pos)
