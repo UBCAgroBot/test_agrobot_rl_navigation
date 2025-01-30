@@ -18,8 +18,8 @@ gym.register(
 class RobotObstacleEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 1}
 
-    def __init__(self, discount=0.9999, render_mode=None) -> None:
-        self.robot_grid_env = GridEnv(size=6)
+    def __init__(self, discount=0.99995, render_mode=None) -> None:
+        self.robot_grid_env = GridEnv(size=14)
         self.render_mode = render_mode
         self.steps: int = 0
         self.discount: float = discount
@@ -30,12 +30,12 @@ class RobotObstacleEnv(gym.Env):
                 "space": gym.spaces.Box(
                     low=0,
                     high=3,
-                    shape=(self.robot_grid_env.length, self.robot_grid_env.width),
+                    shape=(self.robot_grid_env.size, self.robot_grid_env.size),
                     dtype=np.uint8,
                 ),
                 "agent": gym.spaces.Box(
                     low=np.array([0, 0]),
-                    high=np.array([self.robot_grid_env.size, self.robot_grid_env.size]),
+                    high=np.array([self.robot_grid_env.size-1, self.robot_grid_env.size-1]),
                     shape=(2,),
                     dtype=np.uint8,
                 ),
@@ -67,7 +67,7 @@ class RobotObstacleEnv(gym.Env):
 
         return obs, info
 
-    def step(self, action: RobotActionSpace) -> tuple[dict, float, bool, bool, dict]:
+    def step(self, action: int) -> tuple[dict, float, bool, bool, dict]:
         self.robot_grid_env.move(action=action)
 
         reward = 0

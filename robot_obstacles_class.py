@@ -19,10 +19,10 @@ class GridEnv:
         self.target_pos: tuple
         self.reset()
 
-    def move(self, action: RobotActionSpace) -> bool:
+    def move(self, action: int) -> bool:
         new_robot_pos: tuple = tuple(
             a + b
-            for a, b in zip(self.robot_pos, _action_space_to_tuple_vec(action.value))
+            for a, b in zip(self.robot_pos, _action_space_to_tuple_vec(action))
         )
         if (
             self._is_in_bounds(new_robot_pos)
@@ -48,7 +48,7 @@ class GridEnv:
 
     def _is_in_bounds(self, point: tuple[int, int]) -> bool:
         x, y = point
-        return 0 <= x < self.length and 0 <= y < self.width
+        return 0 <= x < self.size and 0 <= y < self.size
 
     def _find_item(self, item: GridTile) -> tuple[int, int]:
         pos = np.argwhere(self.env_space == item)
