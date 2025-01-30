@@ -12,7 +12,7 @@ gym.register(
 class RobotObstacleEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 1}
 
-    def __init__(self, discount=0.95, render_mode=None) -> None:
+    def __init__(self, discount=0.9999, render_mode=None) -> None:
         self.robot_grid_env = GridEnv()
         self.render_mode = render_mode
         self.steps: int = 0
@@ -98,12 +98,13 @@ if __name__ == "__main__":
     env = gym.make("RobotObstacleEnv-v0", render_mode="human")
     env.reset()
 
-    for tstep in range(20):
+    for tstep in range(40):
         # rand_action = env.action_space.sample()
         rand_action = int(input())
 
         obs, reward, terminated, _, _ = env.step(_action_to_directions[rand_action])
         env.render()
+        print()
 
         if terminated:
             obs, _ = env.reset()

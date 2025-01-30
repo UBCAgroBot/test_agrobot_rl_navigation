@@ -1,0 +1,20 @@
+[project]
+name = "test-agrobot-rl-2d"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "clay-arras",email = "astrollin.neil@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "numpy (>=2.2.2,<3.0.0)",
+    "stable-baselines3 (>=2.5.0,<3.0.0)",
+    "torch (>=2.6.0,<3.0.0)",
+    "gymnasium (>=1.0.0,<2.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

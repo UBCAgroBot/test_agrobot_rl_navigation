@@ -1,3 +1,6 @@
 __pycache__/
 .mypy_cache/
 .python-version
+poetry.lock
+
+weights/

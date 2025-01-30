@@ -1,8 +1,8 @@
 from enum import Enum
 import random
-from envs import EXAMPLE_ENV
 import numpy as np
 import copy
+from util.maze_generator import maze_generator
 
 
 class RobotActionSpace(Enum):
@@ -17,15 +17,16 @@ _action_space_to_tuple_dict: dict = {
     RobotActionSpace.EAST: (0, 1),
     RobotActionSpace.SOUTH: (1, 0),
     RobotActionSpace.WEST: (0, -1),
-
     RobotActionSpace.NORTH.value: (-1, 0),
     RobotActionSpace.EAST.value: (0, 1),
     RobotActionSpace.SOUTH.value: (1, 0),
-    RobotActionSpace.WEST.value: (0, -1)
+    RobotActionSpace.WEST.value: (0, -1),
 }
+
 
 def _action_space_to_tuple(x: int) -> tuple:
     return _action_space_to_tuple_dict[x]
+
 
 _action_space_to_tuple_vec = np.vectorize(_action_space_to_tuple)
 
@@ -45,7 +46,9 @@ def _import_envs(env: list[list[int]]) -> np.ndarray:
 
 
 class GridEnv:
-    def __init__(self, env: np.ndarray = _import_envs(EXAMPLE_ENV)) -> None:
+    def __init__(
+        self, env: np.ndarray = _import_envs(maze_generator((10, 10)))
+    ) -> None:
         self.env_orig = env
         self.length = len(env)
         self.width = len(env[0])
@@ -69,7 +72,7 @@ class GridEnv:
         return False
 
     def reset(self) -> None:
-        self.env_space = copy.deepcopy(self.env_orig)
+        self.env_space = _import_envs(maze_generator((10, 10)))
         self.robot_pos = self._find_item(GridTile.ROBOT)
         self.target_pos = self._find_item(GridTile.TARGET)
 

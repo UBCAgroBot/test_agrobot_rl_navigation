@@ -12,9 +12,10 @@ use openAI gym to create environment
 # steps:
 
 for environment, bulid up step by step:
-step 1: have 2d box environment of grid (import from dict), with agent being able to be at any point and move around # DONE
-step 2: have the agent train on PPO to hit some target # DONE
-step 3: implement randomized environments and walls
-step 4: implement physics, agent velocity, etc.
-step 5: implement display
-step 6: implement limited visual space
+
+- [x] step 1: have 2d box environment of grid (import from dict), with agent being able to be at any point and move around
+- [x] step 2: have the agent train on PPO to hit some target
+- [ ] step 3: implement randomized environments and walls
+- [ ] step 4: implement physics, agent velocity, etc.
+- [ ] step 5: implement display
+- [ ] step 6: implement limited visual space
