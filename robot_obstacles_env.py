@@ -2,6 +2,12 @@ import numpy as np
 import gymnasium as gym
 from typing import Optional
 from robot_obstacles_class import RobotActionSpace, GridEnv, GridTile
+from robot_util_class import (
+    _import_envs,
+    _action_space_to_tuple_vec,
+    RobotActionSpace,
+    GridTile,
+)
 
 gym.register(
     id="RobotObstacleEnv-v0",
@@ -13,7 +19,7 @@ class RobotObstacleEnv(gym.Env):
     metadata = {"render_modes": ["human"], "render_fps": 1}
 
     def __init__(self, discount=0.9999, render_mode=None) -> None:
-        self.robot_grid_env = GridEnv()
+        self.robot_grid_env = GridEnv(size=6)
         self.render_mode = render_mode
         self.steps: int = 0
         self.discount: float = discount
@@ -30,7 +36,7 @@ class RobotObstacleEnv(gym.Env):
                 "agent": gym.spaces.Box(
                     low=np.array([0, 0]),
                     high=np.array(
-                        [self.robot_grid_env.length, self.robot_grid_env.width]
+                        [self.robot_grid_env.size, self.robot_grid_env.size]
                     ),
                     shape=(2,),
                     dtype=np.uint8,

@@ -1,9 +1,10 @@
 import random
 import bisect
+from robot_util_class import GridTile
 
 
 def maze_generator(
-    dims: tuple[int, int], min_dist: int = 4, depth: int = 3, smoothness: int = 1
+    dims: tuple[int, int], min_dist: int = 3, depth: int = 3, smoothness: int = 1
 ) -> list[list[int]]:
     maze = _maze_generator_attempt(dims, min_dist, depth, smoothness)
     while _verify_maze(maze):
@@ -23,14 +24,14 @@ def _verify_maze(maze: list[list[int]]) -> bool:
 
     def _dfs(coords: tuple[int, int]) -> None:
         curx, cury = coords
-        if nmaze[curx][cury] == 2:
+        if nmaze[curx][cury] == GridTile.TARGET.value:
             return True
-        nmaze[curx][cury] = 3
+        nmaze[curx][cury] = GridTile.WALL.value
         for nx, ny in dirs:
             is_possible = False
             if (
                 _is_in_bounds((curx + nx, cury + ny), (len(maze), len(maze[0])))
-                and nmaze[curx + nx][cury + ny] != 3
+                and nmaze[curx + nx][cury + ny] != GridTile.WALL.value
             ):
                 is_possible |= _dfs((curx + nx, cury + ny))
         return is_possible
@@ -42,14 +43,14 @@ def _verify_maze(maze: list[list[int]]) -> bool:
                     return (i, j)
         raise AssertionError("Item Not Found")
 
-    return _dfs(_find_item(1))
+    return _dfs(_find_item(GridTile.ROBOT.value))
 
 
 def _maze_generator_attempt(
-    dims: tuple[int, int], min_dist: int = 4, depth: int = 3, smoothness: int = 1
+    dims: tuple[int, int], min_dist: int = 3, depth: int = 3, smoothness: int = 1
 ) -> list[list[int]]:
     x, y = dims
-    maze: list[list[int]] = [[3] * y for _ in range(x)]
+    maze: list[list[int]] = [[GridTile.WALL.value] * y for _ in range(x)]
     dirs: list[tuple] = [(0, 1), (1, 0), (0, -1), (-1, 0)]
 
     def _dfs(coords: tuple[int, int]) -> None:
@@ -67,28 +68,21 @@ def _maze_generator_attempt(
                 ],
                 False,
             )
-            # min_indx = 0
-            # for i in range(min_dist):
-            #     if _is_in_bounds((curx + i * nx, cury + i * ny), (x, y)):
-            #         min_indx = i
-
             if min_indx + 1 != min_dist:
                 continue
 
             if all(
-                maze[curx + i * nx][cury + i * ny] == 3
-                for i in range(min(min_dist, min_indx))
+                maze[curx + i * nx][cury + i * ny] == GridTile.WALL.value
+                for i in range(min_dist)
             ):
-                valid_dirs.append(
-                    {"mndist": min(min_dist, min_indx), "coords": (nx, ny)}
-                )
+                valid_dirs.append({"mndist": min_dist, "coords": (nx, ny)})
 
         random.shuffle(valid_dirs)
         for dir in valid_dirs:
             nx, ny = dir["coords"]
             rngdist = dir["mndist"] - random.randint(0, 1)
             for i in range(rngdist):
-                maze[curx + i * nx][cury + i * ny] = 0
+                maze[curx + i * nx][cury + i * ny] = GridTile.FLOOR.value
             _dfs((curx + rngdist * nx, cury + rngdist * ny))
             depth -= 1
 
@@ -98,12 +92,12 @@ def _maze_generator_attempt(
 
     def _place_random_tile(tile_value: int) -> None:
         rx, ry = random.randint(0, x - 1), random.randint(0, y - 1)
-        while maze[rx][ry] != 0:
+        while maze[rx][ry] != GridTile.FLOOR.value:
             rx, ry = random.randint(0, x - 1), random.randint(0, y - 1)
         maze[rx][ry] = tile_value
 
-    _place_random_tile(1)
-    _place_random_tile(2)
+    _place_random_tile(GridTile.ROBOT.value)
+    _place_random_tile(GridTile.TARGET.value)
     return maze
 
 
@@ -115,7 +109,11 @@ def _maze_smoothing(
         for x in range(1, len(maze) - 1):
             for y in range(1, len(maze[0]) - 1):
                 neighbors_2d = [maze[i][y - 1 : y + 2] for i in range(x - 1, x + 2)]
-                floor_count = sum(row.count(0) for row in neighbors_2d)
-                new_grid[x][y] = 0 if floor_count >= neighs else maze[x][y]
+                floor_count = sum(
+                    row.count(GridTile.FLOOR.value) for row in neighbors_2d
+                )
+                new_grid[x][y] = (
+                    GridTile.FLOOR.value if floor_count >= neighs else maze[x][y]
+                )
         maze = new_grid
     return maze
