@@ -7,28 +7,12 @@ import numpy as np
 
 import gymnasium as gym
 from gymnasium import spaces
-from gymnasium.envs.box2d.car_dynamics import Car
-from gymnasium.error import DependencyNotInstalled, InvalidAction
-from gymnasium.utils import EzPickle
+from car_dynamics import Car
 
-
-try:
-    import Box2D
-    from Box2D.b2 import contactListener, fixtureDef, polygonShape
-except ImportError as e:
-    raise DependencyNotInstalled(
-        'Box2D is not installed, you can install it by run `pip install swig` followed by `pip install "gymnasium[box2d]"`'
-    ) from e
-
-try:
-    # As pygame is necessary for using the environment (reset and step) even without a render mode
-    #   therefore, pygame is a necessary import for the environment.
-    import pygame
-    from pygame import gfxdraw
-except ImportError as e:
-    raise DependencyNotInstalled(
-        'pygame is not installed, run `pip install "gymnasium[box2d]"`'
-    ) from e
+import Box2D
+from Box2D.b2 import contactListener, fixtureDef, polygonShape
+import pygame
+from pygame import gfxdraw
 
 
 STATE_W = 96  # less than Atari 160x192
@@ -38,12 +22,12 @@ VIDEO_H = 400
 WINDOW_W = 1000
 WINDOW_H = 800
 
-SCALE = 2.0  # Track scale
+SCALE = 20.0  # Track scale
 TRACK_RAD = 900 / SCALE  # Track is heavily morphed circle with this radius
 PLAYFIELD = 2000 / SCALE  # Game over boundary
 FPS = 50  # Frames per second
-ZOOM = 0.7  # Camera zoom
-ZOOM_FOLLOW = True  # Set to False for fixed view (don't use zoom)
+ZOOM = 0.4  # Camera zoom
+ZOOM_FOLLOW = False  # Set to False for fixed view (don't use zoom)
 
 
 TRACK_DETAIL_STEP = 21 / SCALE
@@ -88,25 +72,16 @@ class FrictionDetector(contactListener):
             return
         if begin:
             obj.tiles.add(tile)
-            if not tile.road_visited:
-                tile.road_visited = True
-                self.env.reward += 1000.0 / len(self.env.track)
-                self.env.tile_visited_count += 1
+            if tile.is_end == True:
+                self.env.reward += 1000.0
 
+                self.env.reached_reward = True
                 print("ENV COMPLETE")
         else:
             obj.tiles.remove(tile)
 
 
-class CarRacing(gym.Env, EzPickle):
-    """
-    ## References
-    - Chris Campbell (2014), http://www.iforce2d.net/b2dtut/top-down-car.
-
-    ## Credits
-    Created by Oleg Klimov
-    """
-
+class CarRacing(gym.Env):
     metadata = {
         "render_modes": [
             "human",
@@ -120,22 +95,9 @@ class CarRacing(gym.Env, EzPickle):
         self,
         render_mode: Optional[str] = None,
         verbose: bool = False,
-        lap_complete_percent: float = 0.95,
-        domain_randomize: bool = False,
-        continuous: bool = True,
     ):
-        EzPickle.__init__(
-            self,
-            render_mode,
-            verbose,
-            lap_complete_percent,
-            domain_randomize,
-            continuous,
-        )
-        self.continuous = continuous
-        self.domain_randomize = domain_randomize
-        self.lap_complete_percent = lap_complete_percent
         self._init_colors()
+        self.reached_reward = False
 
         self.contactListener_keepref = FrictionDetector(self)
         self.world = Box2D.b2World((0, 0), contactListener=self.contactListener_keepref)
@@ -143,33 +105,23 @@ class CarRacing(gym.Env, EzPickle):
         self.surf = None
         self.clock = None
         self.isopen = True
-        self.invisible_state_window = None
-        self.invisible_video_window = None
         self.road = None
         self.car: Optional[Car] = None
         self.reward = 0.0
-        self.prev_reward = 0.0
         self.verbose = verbose
-        self.new_lap = False
         self.fd_tile = fixtureDef(
-            shape=polygonShape(vertices=[(0, 0), (1, 0), (1, -1), (0, -1)])
+            shape=polygonShape(vertices=[(0, 0), (1, 0), (1, -1), (0, -1)]),
+            isSensor=False,
         )
 
-        # This will throw a warning in tests/envs/test_envs in utils/env_checker.py as the space is not symmetric
-        #   or normalised however this is not possible here so ignore
-        if self.continuous:
-            self.action_space = spaces.Box(
-                np.array([-1, 0, 0]).astype(np.float32),
-                np.array([+1, +1, +1]).astype(np.float32),
-            )  # steer, gas, brake
-        else:
-            self.action_space = spaces.Discrete(5)
-            # do nothing, left, right, gas, brake
+        self.action_space = spaces.Box(
+            np.array([-1, 0, 0]).astype(np.float32),
+            np.array([+1, +1, +1]).astype(np.float32),
+        )  # steer, gas, brake
 
         self.observation_space = spaces.Box(
             low=0, high=255, shape=(STATE_H, STATE_W, 3), dtype=np.uint8
         )
-
         self.render_mode = render_mode
 
     def _destroy(self):
@@ -182,35 +134,9 @@ class CarRacing(gym.Env, EzPickle):
         self.car.destroy()
 
     def _init_colors(self):
-        if self.domain_randomize:
-            # domain randomize the bg and grass colour
-            self.road_color = self.np_random.uniform(0, 210, size=3)
-
-            self.bg_color = self.np_random.uniform(0, 210, size=3)
-
-            self.grass_color = np.copy(self.bg_color)
-            idx = self.np_random.integers(3)
-            self.grass_color[idx] += 20
-        else:
-            # default colours
-            self.road_color = np.array([102, 102, 102])
-            self.bg_color = np.array([102, 204, 102])
-            self.grass_color = np.array([102, 230, 102])
-
-    def _reinit_colors(self, randomize):
-        assert (
-            self.domain_randomize
-        ), "domain_randomize must be True to use this function."
-
-        if randomize:
-            # domain randomize the bg and grass colour
-            self.road_color = self.np_random.uniform(0, 210, size=3)
-
-            self.bg_color = self.np_random.uniform(0, 210, size=3)
-
-            self.grass_color = np.copy(self.bg_color)
-            idx = self.np_random.integers(3)
-            self.grass_color[idx] += 20
+        self.road_color = np.array([102, 102, 102])
+        self.bg_color = np.array([102, 204, 102])
+        self.grass_color = np.array([102, 230, 102])
 
     def reset(
         self,
@@ -225,31 +151,25 @@ class CarRacing(gym.Env, EzPickle):
         )
         self.world.contactListener = self.world.contactListener_bug_workaround
         self.reward = 0.0
-        self.prev_reward = 0.0
-        self.tile_visited_count = 0
         self.t = 0.0
-        self.new_lap = False
+        self.reached_reward = False
 
         vertices = [(50, 50), (60, 50), (60, 60), (50, 60)]
-        self.road_poly = [(vertices, self.road_color)]
+        vertices1 = [(15, 15), (25, 15), (25, 25), (15, 25)]
+        self.road_poly = [(vertices, self.road_color), (vertices1, self.road_color)]
         self.road = []
         self.fd_tile.shape.vertices = vertices
-        t = self.world.CreateStaticBody(fixtures=self.fd_tile)
+        # t = self.world.CreateStaticBody(fixtures=self.fd_tile)
+        t = self.world.CreateStaticBody(position=(20, 20))
+        t.CreateFixture(
+            fixtureDef(shape=polygonShape(box=(5, 5)), isSensor=False)
+        )
         t.userData = t
         t.color = self.road_color
-        t.road_visited = False
+        t.is_end = True
         t.road_friction = 1.0
         t.idx = 0
-        t.fixtures[0].sensor = True
         self.road.append(t)
-
-        if self.domain_randomize:
-            randomize = True
-            if isinstance(options, dict):
-                if "randomize" in options:
-                    randomize = options["randomize"]
-
-            self._reinit_colors(randomize)
 
         self.track = [(0, 0, 0, 0)]
         self.car = Car(self.world, *self.track[0][1:4])
@@ -261,20 +181,10 @@ class CarRacing(gym.Env, EzPickle):
     def step(self, action: Union[np.ndarray, int]):
         assert self.car is not None
         if action is not None:
-            if self.continuous:
-                action = action.astype(np.float64)
-                self.car.steer(-action[0])
-                self.car.gas(action[1])
-                self.car.brake(action[2])
-            else:
-                if not self.action_space.contains(action):
-                    raise InvalidAction(
-                        f"you passed the invalid action `{action}`. "
-                        f"The supported action_space is `{self.action_space}`"
-                    )
-                self.car.steer(-0.6 * (action == 1) + 0.6 * (action == 2))
-                self.car.gas(0.2 * (action == 3))
-                self.car.brake(0.8 * (action == 4))
+            action = action.astype(np.float64)
+            self.car.steer(-action[0])
+            self.car.gas(action[1])
+            self.car.brake(action[2])
 
         self.car.step(1.0 / FPS)
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
@@ -291,16 +201,11 @@ class CarRacing(gym.Env, EzPickle):
             # We actually don't want to count fuel spent, we want car to be faster.
             # self.reward -=  10 * self.car.fuel_spent / ENGINE_POWER
             self.car.fuel_spent = 0.0
-            step_reward = self.reward - self.prev_reward
-            self.prev_reward = self.reward
-            if self.tile_visited_count == len(self.track) or self.new_lap:
-                # Termination due to finishing lap
+            if self.reached_reward == True:
                 terminated = True
-                info["lap_finished"] = True
             x, y = self.car.hull.position
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                 terminated = True
-                info["lap_finished"] = False
                 step_reward = -100
 
         if self.render_mode == "human":
