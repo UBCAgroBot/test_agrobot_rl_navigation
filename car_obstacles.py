@@ -21,13 +21,13 @@ VIDEO_W = 600
 VIDEO_H = 400
 WINDOW_W = 1000
 WINDOW_H = 800
+TILE_DIMS = 5
 
 SCALE = 20.0  # Track scale
 TRACK_RAD = 900 / SCALE  # Track is heavily morphed circle with this radius
 PLAYFIELD = 2000 / SCALE  # Game over boundary
 FPS = 50  # Frames per second
 ZOOM = 0.4  # Camera zoom
-ZOOM_FOLLOW = False  # Set to False for fixed view (don't use zoom)
 
 
 TRACK_DETAIL_STEP = 21 / SCALE
@@ -47,38 +47,37 @@ class FrictionDetector(contactListener):
         self.env = env
 
     def BeginContact(self, contact):
-        self._contact(contact, True)
+        ret = self._identify_contact_objs(contact)
+        if ret:
+            obj, tile = ret
+            obj.tiles.add(tile)
+            if tile.is_end:
+                self.env.reward += 1000.0
+                self.env.reached_reward = True
 
     def EndContact(self, contact):
-        self._contact(contact, False)
+        ret = self._identify_contact_objs(contact)
+        if ret:
+            obj, tile = ret
+            obj.tiles.remove(tile)
 
-    def _contact(self, contact, begin):
+    def _identify_contact_objs(self, contact):
         tile = None
         obj = None
         u1 = contact.fixtureA.body.userData
         u2 = contact.fixtureB.body.userData
-        if u1 and "road_friction" in u1.__dict__:
+        if not u1 or not u2:
+            return False
+
+        if "road_friction" in u1.__dict__ and "tiles" in u2.__dict__:
             tile = u1
             obj = u2
-        if u2 and "road_friction" in u2.__dict__:
+        elif "road_friction" in u2.__dict__ and "tiles" in u1.__dict__:
             tile = u2
             obj = u1
-        if not tile:
-            return
-
-        # inherit tile color from env
-        tile.color[:] = self.env.road_color
-        if not obj or "tiles" not in obj.__dict__:
-            return
-        if begin:
-            obj.tiles.add(tile)
-            if tile.is_end == True:
-                self.env.reward += 1000.0
-
-                self.env.reached_reward = True
-                print("ENV COMPLETE")
         else:
-            obj.tiles.remove(tile)
+            return False
+        return obj, tile
 
 
 class CarRacing(gym.Env):
@@ -96,45 +95,42 @@ class CarRacing(gym.Env):
         render_mode: Optional[str] = None,
         verbose: bool = False,
     ):
-        self._init_colors()
-        self.reached_reward = False
-
-        self.contactListener_keepref = FrictionDetector(self)
-        self.world = Box2D.b2World((0, 0), contactListener=self.contactListener_keepref)
-        self.screen: Optional[pygame.Surface] = None
-        self.surf = None
-        self.clock = None
-        self.isopen = True
-        self.road = None
-        self.car: Optional[Car] = None
-        self.reward = 0.0
+        self.render_mode = render_mode
         self.verbose = verbose
-        self.fd_tile = fixtureDef(
-            shape=polygonShape(vertices=[(0, 0), (1, 0), (1, -1), (0, -1)]),
-            isSensor=False,
-        )
+        self.reward = 0.0
+        self.robot: Optional[Car] = None
+        self.obstacles = []
+        self.target = None
+        self.is_open = True
+        self.clock = None
+        self.surf = None
+        self.screen: Optional[pygame.Surface] = None
 
+        self.world = Box2D.b2World((0, 0), contactListener=FrictionDetector(self))
+        self.reached_reward = False
         self.action_space = spaces.Box(
-            np.array([-1, 0, 0]).astype(np.float32),
-            np.array([+1, +1, +1]).astype(np.float32),
+            low=np.array([-1, 0, 0], dtype=np.float32),
+            high=np.array([1, 1, 1], dtype=np.float32),
         )  # steer, gas, brake
-
         self.observation_space = spaces.Box(
             low=0, high=255, shape=(STATE_H, STATE_W, 3), dtype=np.uint8
         )
-        self.render_mode = render_mode
+        self._init_colors()
 
     def _destroy(self):
-        if not self.road:
+        if not self.obstacles:
             return
-        for t in self.road:
+        for t in self.obstacles:
             self.world.DestroyBody(t)
-        self.road = []
-        assert self.car is not None
-        self.car.destroy()
+        self.world.DestroyBody(self.target)
+        self.obstacles = []
+        self.target = None
+        assert self.robot is not None
+        self.robot.destroy()
 
     def _init_colors(self):
-        self.road_color = np.array([102, 102, 102])
+        self.obs_color = np.array([102, 102, 102])
+        self.end_color = np.array([20, 20, 192])
         self.bg_color = np.array([102, 204, 102])
         self.grass_color = np.array([102, 230, 102])
 
@@ -146,50 +142,63 @@ class CarRacing(gym.Env):
     ):
         super().reset(seed=seed)
         self._destroy()
-        self.world.contactListener_bug_workaround = FrictionDetector(
-            self
-        )
-        self.world.contactListener = self.world.contactListener_bug_workaround
-        self.reward = 0.0
-        self.t = 0.0
-        self.reached_reward = False
-
-        vertices = [(50, 50), (60, 50), (60, 60), (50, 60)]
-        vertices1 = [(15, 15), (25, 15), (25, 25), (15, 25)]
-        self.road_poly = [(vertices, self.road_color), (vertices1, self.road_color)]
-        self.road = []
-        self.fd_tile.shape.vertices = vertices
-        # t = self.world.CreateStaticBody(fixtures=self.fd_tile)
-        t = self.world.CreateStaticBody(position=(20, 20))
-        t.CreateFixture(
-            fixtureDef(shape=polygonShape(box=(5, 5)), isSensor=False)
-        )
-        t.userData = t
-        t.color = self.road_color
-        t.is_end = True
-        t.road_friction = 1.0
-        t.idx = 0
-        self.road.append(t)
-
-        self.track = [(0, 0, 0, 0)]
-        self.car = Car(self.world, *self.track[0][1:4])
+        self._initialize_contact_listener()
+        self._reset_environment()
 
         if self.render_mode == "human":
             self.render()
         return self.step(None)[0], {}
 
+    def _initialize_contact_listener(self):
+        self.world.contactListener_bug_workaround = FrictionDetector(self)
+        self.world.contactListener = self.world.contactListener_bug_workaround
+
+    def _reset_environment(self):
+        self.reward = 0.0
+        self.t = 0.0
+        self.reached_reward = False
+        self.obstacles_poly = []
+        self.obstacles = []
+
+        obj, obj_poly = self._get_tile(55, 80)
+        self.obstacles.append(obj)
+        self.obstacles_poly.append(obj_poly)
+
+        end, end_poly = self._get_tile(20, 20, is_end=True)
+        self.target = end
+        self.obstacles_poly.append(end_poly)
+        self.robot = Car(self.world, 0, 0, 0)
+
+    def _get_tile(self, x: int, y: int, is_end: bool = False):
+        t = self.world.CreateStaticBody(position=(x, y))
+        t.userData = t
+        t.is_end = is_end
+        t.road_friction = 1.0
+        t.color = self.end_color if is_end else self.obs_color
+        t.CreateFixture(
+            fixtureDef(shape=polygonShape(box=(TILE_DIMS, TILE_DIMS)), isSensor=is_end)
+        )
+
+        vertices = [
+            (x - TILE_DIMS, y - TILE_DIMS),
+            (x + TILE_DIMS, y - TILE_DIMS),
+            (x + TILE_DIMS, y + TILE_DIMS),
+            (x - TILE_DIMS, y + TILE_DIMS),
+        ]
+        poly_info = (vertices, t.color)
+        return t, poly_info
+
     def step(self, action: Union[np.ndarray, int]):
-        assert self.car is not None
+        assert self.robot is not None
         if action is not None:
             action = action.astype(np.float64)
-            self.car.steer(-action[0])
-            self.car.gas(action[1])
-            self.car.brake(action[2])
+            self.robot.steer(-action[0])
+            self.robot.gas(action[1])
+            self.robot.brake(action[2])
 
-        self.car.step(1.0 / FPS)
+        self.robot.step(1.0 / FPS)
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
         self.t += 1.0 / FPS
-
         self.state = self._render("state_pixels")
 
         step_reward = 0
@@ -200,10 +209,10 @@ class CarRacing(gym.Env):
             self.reward -= 0.1
             # We actually don't want to count fuel spent, we want car to be faster.
             # self.reward -=  10 * self.car.fuel_spent / ENGINE_POWER
-            self.car.fuel_spent = 0.0
-            if self.reached_reward == True:
+            self.robot.fuel_spent = 0.0
+            if self.reached_reward:
                 terminated = True
-            x, y = self.car.hull.position
+            x, y = self.robot.hull.position
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                 terminated = True
                 step_reward = -100
@@ -240,18 +249,18 @@ class CarRacing(gym.Env):
 
         self.surf = pygame.Surface((WINDOW_W, WINDOW_H))
 
-        assert self.car is not None
+        assert self.robot is not None
         # computing transformations
-        angle = -self.car.hull.angle
+        angle = -self.robot.hull.angle
         # Animating first second zoom.
         zoom = 0.1 * SCALE * max(1 - self.t, 0) + ZOOM * SCALE * min(self.t, 1)
-        scroll_x = -(self.car.hull.position[0]) * zoom
-        scroll_y = -(self.car.hull.position[1]) * zoom
+        scroll_x = -(self.robot.hull.position[0]) * zoom
+        scroll_y = -(self.robot.hull.position[1]) * zoom
         trans = pygame.math.Vector2((scroll_x, scroll_y)).rotate_rad(angle)
         trans = (WINDOW_W / 2 + trans[0], WINDOW_H / 4 + trans[1])
 
         self._render_road(zoom, trans, angle)
-        self.car.draw(
+        self.robot.draw(
             self.surf,
             zoom,
             trans,
@@ -299,7 +308,7 @@ class CarRacing(gym.Env):
         )
 
         # draw road
-        for poly, color in self.road_poly:
+        for poly, color in self.obstacles_poly:
             # converting to pixel coordinates
             poly = [(p[0], p[1]) for p in poly]
             color = [int(c) for c in color]
@@ -328,10 +337,10 @@ class CarRacing(gym.Env):
                 ((place + 0) * s, H - 2 * h),
             ]
 
-        assert self.car is not None
+        assert self.robot is not None
         true_speed = np.sqrt(
-            np.square(self.car.hull.linearVelocity[0])
-            + np.square(self.car.hull.linearVelocity[1])
+            np.square(self.robot.hull.linearVelocity[0])
+            + np.square(self.robot.hull.linearVelocity[1])
         )
 
         # simple wrapper to render if the indicator value is above a threshold
@@ -342,34 +351,34 @@ class CarRacing(gym.Env):
         render_if_min(true_speed, vertical_ind(5, 0.02 * true_speed), (255, 255, 255))
         # ABS sensors
         render_if_min(
-            self.car.wheels[0].omega,
-            vertical_ind(7, 0.01 * self.car.wheels[0].omega),
+            self.robot.wheels[0].omega,
+            vertical_ind(7, 0.01 * self.robot.wheels[0].omega),
             (0, 0, 255),
         )
         render_if_min(
-            self.car.wheels[1].omega,
-            vertical_ind(8, 0.01 * self.car.wheels[1].omega),
+            self.robot.wheels[1].omega,
+            vertical_ind(8, 0.01 * self.robot.wheels[1].omega),
             (0, 0, 255),
         )
         render_if_min(
-            self.car.wheels[2].omega,
-            vertical_ind(9, 0.01 * self.car.wheels[2].omega),
+            self.robot.wheels[2].omega,
+            vertical_ind(9, 0.01 * self.robot.wheels[2].omega),
             (51, 0, 255),
         )
         render_if_min(
-            self.car.wheels[3].omega,
-            vertical_ind(10, 0.01 * self.car.wheels[3].omega),
+            self.robot.wheels[3].omega,
+            vertical_ind(10, 0.01 * self.robot.wheels[3].omega),
             (51, 0, 255),
         )
 
         render_if_min(
-            self.car.wheels[0].joint.angle,
-            horiz_ind(20, -10.0 * self.car.wheels[0].joint.angle),
+            self.robot.wheels[0].joint.angle,
+            horiz_ind(20, -10.0 * self.robot.wheels[0].joint.angle),
             (0, 255, 0),
         )
         render_if_min(
-            self.car.hull.angularVelocity,
-            horiz_ind(30, -0.8 * self.car.hull.angularVelocity),
+            self.robot.hull.angularVelocity,
+            horiz_ind(30, -0.8 * self.robot.hull.angularVelocity),
             (255, 0, 0),
         )
 
