@@ -1,4 +1,6 @@
-__credits__ = ["Andrea PIERRÉ"]
+"""
+Car racing environment adapted with maze generation and A*, originally from OpenAI Gymnasium
+"""
 
 import math
 from typing import Optional, Union
