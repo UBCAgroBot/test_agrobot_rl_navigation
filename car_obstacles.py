@@ -2,9 +2,7 @@ __credits__ = ["Andrea PIERRÉ"]
 
 import math
 from typing import Optional, Union
-
 import numpy as np
-
 import gymnasium as gym
 from gymnasium import spaces
 from car_dynamics import Car
@@ -14,6 +12,8 @@ from Box2D.b2 import contactListener, fixtureDef, polygonShape
 import pygame
 from pygame import gfxdraw
 
+from util.maze_generator import maze_generator
+
 
 STATE_W = 96  
 STATE_H = 96
@@ -21,12 +21,12 @@ VIDEO_W = 600
 VIDEO_H = 400
 WINDOW_W = 1000
 WINDOW_H = 800
-TILE_DIMS = 5 
+TILE_DIMS = 20
 
-SCALE = 20.0  
+SCALE = 10.0  
 PLAYFIELD = 2000 / SCALE  
 FPS = 50 
-ZOOM = 0.4  
+ZOOM = 0.3  
 MAX_SHAPE_DIM = TILE_DIMS * math.sqrt(2) * ZOOM * SCALE
 
 
@@ -94,6 +94,7 @@ class CarRacing(gym.Env):
         self.is_open = True
         self.clock = None
         self.surf = None
+        self.maze = None
         self.screen: Optional[pygame.Surface] = None
 
         self.world = Box2D.b2World((0, 0), contactListener=FrictionDetector(self))
@@ -144,20 +145,27 @@ class CarRacing(gym.Env):
         self.world.contactListener = self.world.contactListener_bug_workaround
 
     def _reset_environment(self):
+        self.maze = maze_generator((2*int(PLAYFIELD/TILE_DIMS), 2*int(PLAYFIELD/TILE_DIMS)))
+
         self.reward = 0.0
         self.t = 0.0
         self.reached_reward = False
         self.obstacles_poly = []
         self.obstacles = []
 
-        obj, obj_poly = self._get_tile(55, 80)
-        self.obstacles.append(obj)
-        self.obstacles_poly.append(obj_poly)
-
-        end, end_poly = self._get_tile(20, 20, is_end=True)
-        self.target = end
-        self.obstacles_poly.append(end_poly)
-        self.robot = Car(self.world, 0, 0, 0)
+        for x in range(len(self.maze)):
+            for y in range(len(self.maze[0])):
+                xcoord, ycoord = int(x*TILE_DIMS + TILE_DIMS/2) - PLAYFIELD, int(y*TILE_DIMS + TILE_DIMS/2) - PLAYFIELD
+                if self.maze[x][y] == 1:
+                    self.robot = Car(self.world, 0, xcoord, ycoord)
+                if self.maze[x][y] == 2:
+                    end, end_poly = self._get_tile(xcoord, ycoord, is_end=True)
+                    self.target = end
+                    self.obstacles_poly.append(end_poly)
+                if self.maze[x][y] == 3:
+                    obj, obj_poly = self._get_tile(xcoord, ycoord, is_end=False)
+                    self.obstacles.append(obj)
+                    self.obstacles_poly.append(obj_poly)
 
     def _get_tile(self, x: int, y: int, is_end: bool = False):
         t = self.world.CreateStaticBody(position=(x, y))
@@ -166,14 +174,14 @@ class CarRacing(gym.Env):
         t.road_friction = 1.0
         t.color = self.end_color if is_end else self.obs_color
         t.CreateFixture(
-            fixtureDef(shape=polygonShape(box=(TILE_DIMS/2, TILE_DIMS/2)), isSensor=is_end)
+            fixtureDef(shape=polygonShape(box=(int(TILE_DIMS/2), int(TILE_DIMS/2))), isSensor=is_end)
         )
 
         vertices = [
-            (x - TILE_DIMS/2, y - TILE_DIMS/2),
-            (x + TILE_DIMS/2, y - TILE_DIMS/2),
-            (x + TILE_DIMS/2, y + TILE_DIMS/2),
-            (x - TILE_DIMS/2, y + TILE_DIMS/2),
+            (x - int(TILE_DIMS/2), y - int(TILE_DIMS/2)),
+            (x + int(TILE_DIMS/2), y - int(TILE_DIMS/2)),
+            (x + int(TILE_DIMS/2), y + int(TILE_DIMS/2)),
+            (x - int(TILE_DIMS/2), y + int(TILE_DIMS/2)),
         ]
         poly_info = (vertices, t.color)
         return t, poly_info
