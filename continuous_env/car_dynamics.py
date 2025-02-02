@@ -27,7 +27,7 @@ SIZE = 0.02
 ENGINE_POWER = 100000000 * SIZE * SIZE
 WHEEL_MOMENT_OF_INERTIA = 4000 * SIZE * SIZE
 FRICTION_LIMIT = (
-    1000000 * SIZE * SIZE
+    5000000 * SIZE * SIZE
 )  # friction ~= mass ~= size^2 (calculated implicitly using density)
 WHEEL_R = 27
 WHEEL_W = 14
@@ -160,8 +160,8 @@ class Car:
         gas = np.clip(gas, 0, 1)
         for w in self.wheels[2:4]:
             diff = gas - w.gas
-            if diff > 0.1:
-                diff = 0.1
+            if diff > 0.05:
+                diff = 0.05
             w.gas -= diff
 
     def brake(self, b):

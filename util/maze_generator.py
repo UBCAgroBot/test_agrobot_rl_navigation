@@ -1,6 +1,6 @@
 import random
 import bisect
-from robot_util_class import GridTile
+from discrete_env.robot_util_class import GridTile
 
 
 def maze_generator(

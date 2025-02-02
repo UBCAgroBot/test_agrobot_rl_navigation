@@ -173,7 +173,7 @@ class CarRacing(gym.Env):
         t = self.world.CreateStaticBody(position=(x, y))
         t.userData = t
         t.is_end = is_end
-        t.road_friction = 1.0
+        t.road_friction = 2.0
         t.color = self.end_color if is_end else self.obs_color
         t.CreateFixture(
             fixtureDef(shape=polygonShape(box=(int(TILE_DIMS/2), int(TILE_DIMS/2))), isSensor=is_end)
