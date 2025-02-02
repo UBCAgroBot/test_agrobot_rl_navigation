@@ -36,14 +36,14 @@ HULL_POLY1 = [(-60, +130), (+60, +130), (+60, +110), (-60, +110)]
 # HULL_POLY1 = [(0, +220), (+60, +110), (-60, +110)]
 HULL_POLY2 = [(-15, +120), (+15, +120), (+20, +20), (-20, 20)]
 HULL_POLY3 = [
-    (+25, +20),
+    (+25, +10),
     (+50, -10),
     (+50, -40),
     (+20, -90),
     (-20, -90),
     (-50, -40),
     (-50, -10),
-    (-25, +20),
+    (-25, +10),
 ]
 HULL_POLY4 = [(-50, -120), (+50, -120), (+50, -90), (-50, -90)]
 WHEEL_COLOR = (0, 0, 0)
@@ -155,6 +155,14 @@ class Car:
             if diff > 0.1:
                 diff = 0.1  # gradually increase, but stop immediately
             w.gas += diff
+
+    def reverse(self, gas):
+        gas = np.clip(gas, 0, 1)
+        for w in self.wheels[2:4]:
+            diff = gas - w.gas
+            if diff > 0.1:
+                diff = 0.1
+            w.gas -= diff
 
     def brake(self, b):
         """control: brake

@@ -102,9 +102,9 @@ class CarRacing(gym.Env):
         self.world = Box2D.b2World((0, 0), contactListener=FrictionDetector(self))
         self.reached_reward = False
         self.action_space = spaces.Box(
-            low=np.array([-1, 0, 0], dtype=np.float32),
-            high=np.array([1, 1, 1], dtype=np.float32),
-        )  # steer, gas, brake
+            low=np.array([-1, 0, 0, 0], dtype=np.float32),
+            high=np.array([1, 1, 1, 1], dtype=np.float32),
+        )  # steer, gas, brake, reverse
         self.observation_space = spaces.Box(
             low=0, high=255, shape=(STATE_H, STATE_W, 3), dtype=np.uint8
         )
@@ -195,6 +195,7 @@ class CarRacing(gym.Env):
             self.robot.steer(-action[0])
             self.robot.gas(action[1])
             self.robot.brake(action[2])
+            self.robot.reverse(action[3])
 
         self.robot.step(1.0 / FPS)
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
@@ -416,7 +417,7 @@ class CarRacing(gym.Env):
 
 
 if __name__ == "__main__":
-    a = np.array([0.0, 0.0, 0.0])
+    a = np.array([0.0, 0.0, 0.0, 0.0])
 
     def register_input():
         global quit, restart
@@ -428,8 +429,10 @@ if __name__ == "__main__":
                     a[0] = +1.0
                 if event.key == pygame.K_UP:
                     a[1] = +1.0
+                if event.key == pygame.K_LSHIFT:
+                    a[2] = +0.8
                 if event.key == pygame.K_DOWN:
-                    a[2] = +0.8  # set 1.0 for wheels to block to zero rotation
+                    a[3] = +0.3
                 if event.key == pygame.K_RETURN:
                     restart = True
                 if event.key == pygame.K_ESCAPE:
@@ -442,8 +445,10 @@ if __name__ == "__main__":
                     a[0] = 0
                 if event.key == pygame.K_UP:
                     a[1] = 0
-                if event.key == pygame.K_DOWN:
+                if event.key == pygame.K_LSHIFT:
                     a[2] = 0
+                if event.key == pygame.K_DOWN:
+                    a[3] = 0
 
             if event.type == pygame.QUIT:
                 quit = True
