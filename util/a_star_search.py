@@ -1,5 +1,5 @@
-import heapq
 from collections import defaultdict
+import math
 
 
 def a_star_pathfinding(maze: list[list[int]]) -> list[tuple[int, int]]:
@@ -19,20 +19,27 @@ def _search(maze: list[list[int]]) -> list[list[tuple[int, int]]]:
     def _is_walkable(x: int, y: int) -> bool:
         return maze[x][y] != 3
 
-    to_search = []
+    to_search = set()
     visited = set()
-    g_score = defaultdict(lambda: float("inf"))
+    g_score = defaultdict(lambda: 1e10)
     parent = [[None for _ in range(len(maze[0]))] for _ in range(len(maze))]
 
-    start_x, start_y = _find_item(0, maze)
-    start_h = _get_h_value((start_x, start_y), maze)
-    to_search.append(((start_h, start_h), (start_x, start_y)))
+    start_x, start_y = _find_item(1, maze)
+    to_search.add((start_x, start_y))
 
     dirs = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
     while len(to_search):
-        _, (x, y) = heapq.heappop(to_search)
-        visited.add((x, y))
+        x, y = None, None
+        f_score = 1e12
+        for qx, qy in to_search:
+            h_value = _get_h_value((qx, qy), maze)
+            new_f_score = h_value + g_score[(qx, qy)] 
+            if new_f_score < f_score or (new_f_score == new_f_score and h_value < _get_h_value((x, y), maze)):
+                x, y = qx, qy
+                f_score = new_f_score
 
+        to_search.remove((x, y))
+        visited.add((x, y))
         for dir in dirs:
             nx, ny = x + dir[0], y + dir[1]
             if (
@@ -50,15 +57,7 @@ def _search(maze: list[list[int]]) -> list[list[tuple[int, int]]]:
                 parent[nx][ny] = (x, y)
 
                 if not in_search:
-                    to_search.append(
-                        (
-                            (
-                                cost_to_neighbor + _get_h_value((nx, ny), maze),
-                                cost_to_neighbor,
-                            ),
-                            (nx, ny),
-                        )
-                    )
+                    to_search.add((nx, ny))
     return parent
 
 
@@ -78,7 +77,7 @@ def _backtrack(parent: list[list[tuple[int, int]]], start: tuple[int, int], end:
 def _get_h_value(node: tuple[int, int], maze: list[list[int]]) -> float:
     x, y = node
     ix, iy = _find_item(2, maze)
-    return (x - ix) ** 2 + (y - iy) ** 2
+    return math.sqrt((x - ix) ** 2 + (y - iy) ** 2)
 
 
 def _find_item(value: int, maze: list[list[int]]) -> tuple[int, int]:
@@ -87,3 +86,9 @@ def _find_item(value: int, maze: list[list[int]]) -> tuple[int, int]:
             if maze[i][j] == value:
                 return (i, j)
     raise AssertionError("Item Not Found")
+
+
+if __name__ == "__main__":
+    maze = [
+        
+    ]
