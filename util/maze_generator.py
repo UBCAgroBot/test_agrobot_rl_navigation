@@ -47,7 +47,7 @@ def _verify_maze(maze: list[list[int]]) -> bool:
 
 
 def _maze_generator_attempt(
-    dims: tuple[int, int], min_dist: int = 3, depth: int = 3, smoothness: int = 1
+    dims: tuple[int, int], min_dist: int = 4, depth: int = 4, smoothness: int = 1
 ) -> list[list[int]]:
     x, y = dims
     maze: list[list[int]] = [[GridTile.WALL.value] * y for _ in range(x)]

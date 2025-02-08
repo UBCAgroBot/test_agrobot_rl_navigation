@@ -11,5 +11,9 @@ for environment, bulid up step by step:
 
 next steps:
 
+- REFACTORING + MYPY + DOCSTRINGS
 - need to figure out how to render path without accounting for updating the car position
 - need to figure out how to continuously update car position
+- need to pixelize the map more -- make blocks smaller
+- bug finding: fix A\* pathfinding
+- improvement: make map generation better
