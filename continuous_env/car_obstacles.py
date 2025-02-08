@@ -284,7 +284,10 @@ class CarRacing(gym.Env):
         trans = (WINDOW_W / 2 + trans[0], WINDOW_H / 4 + trans[1])
 
         self._render_items(zoom, trans, angle)
-        self._render_pathfinding(zoom, trans, angle)
+        try: 
+            self._render_pathfinding(zoom, trans, angle)
+        except:
+            pass
         self.robot.draw(
             self.surf,
             zoom,
