@@ -30,5 +30,28 @@ torch = {source = "pytorch-gpu"}
 torchvision = {source = "pytorch-gpu"}
 torchaudio = {source = "pytorch-gpu"}
 
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^4.1.0"
+
 [tool.poetry]
 package-mode = false
+
+[tool.ruff]
+line-length = 88
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+explicit_package_bases = true
+namespace_packages = true
+
+[tool.poetry]
+packages = [
+    { include = "continuous_env" },
+    { include = "discrete_env" },
+    { include = "util" }
+]
