@@ -7,7 +7,8 @@ from typing import Optional, Union
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
-from car_dynamics import Car
+from continuous_env.car_dynamics import Car
+from util.astar_search import astar_pathfinding, _find_item
 
 import Box2D
 from Box2D.b2 import contactListener, fixtureDef, polygonShape
@@ -97,6 +98,8 @@ class CarRacing(gym.Env):
         self.clock = None
         self.surf = None
         self.maze = None
+        self.maze_updated = None
+        self.path = None
         self.screen: Optional[pygame.Surface] = None
 
         self.world = Box2D.b2World((0, 0), contactListener=FrictionDetector(self))
@@ -126,6 +129,7 @@ class CarRacing(gym.Env):
         self.end_color = np.array([20, 20, 192])
         self.bg_color = np.array([102, 204, 102])
         self.grass_color = np.array([102, 230, 102])
+        self.path_color = np.array([230, 230, 230])
 
     def reset(
         self,
@@ -150,10 +154,12 @@ class CarRacing(gym.Env):
         self.maze = maze_generator(
             (2 * int(PLAYFIELD / TILE_DIMS), 2 * int(PLAYFIELD / TILE_DIMS))
         )
+        self.maze_updated = True
 
         self.reward = 0.0
         self.t = 0.0
         self.reached_reward = False
+        self.path = []
         self.obstacles_poly = []
         self.obstacles = []
 
@@ -209,6 +215,15 @@ class CarRacing(gym.Env):
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
         self.t += 1.0 / FPS
         self.state = self._render("state_pixels")
+
+        x, y = self.robot.hull.position
+        nx = int((x + PLAYFIELD - TILE_DIMS / 2) / TILE_DIMS)
+        ny = int((y + PLAYFIELD - TILE_DIMS / 2) / TILE_DIMS)
+        ox, oy = _find_item(1, self.maze)
+        self.maze[ox][oy] = 0
+        self.maze[nx][ny] = 1
+        if nx != x or ny != ny:
+            self.maze_updated = True
 
         step_reward = 0
         terminated = False
@@ -268,7 +283,8 @@ class CarRacing(gym.Env):
         trans = pygame.math.Vector2((scroll_x, scroll_y)).rotate_rad(angle)
         trans = (WINDOW_W / 2 + trans[0], WINDOW_H / 4 + trans[1])
 
-        self._render_road(zoom, trans, angle)
+        self._render_items(zoom, trans, angle)
+        self._render_pathfinding(zoom, trans, angle)
         self.robot.draw(
             self.surf,
             zoom,
@@ -301,8 +317,34 @@ class CarRacing(gym.Env):
             return self._create_image_array(self.surf, (STATE_W, STATE_H))
         else:
             return self.isopen
+    
+    def _render_pathfinding(self, zoom, translation, angle):
+        if self.maze_updated:
+            self.maze_updated = False
+            self.path = astar_pathfinding(self.maze)
+        
+        def _fix_coords(coords: tuple[int, int]): 
+            coords = pygame.math.Vector2(coords).rotate_rad(angle)
+            coords = (coords[0] * zoom + translation[0], coords[1] * zoom + translation[1]) 
+            return int(coords[0]), int(coords[1])
+            
+        def _get_center(x: int, y: int):
+            xcoord, ycoord = (
+                int(x * TILE_DIMS + TILE_DIMS / 2) - PLAYFIELD,
+                int(y * TILE_DIMS + TILE_DIMS / 2) - PLAYFIELD,
+            )
+            return int(xcoord), int(ycoord)
 
-    def _render_road(self, zoom, translation, angle):
+        prev = self.path[0]
+        for curr in self.path[1:]:
+            px, py = _get_center(*prev)
+            cx, cy = _get_center(*curr)
+            px, py = _fix_coords((px, py))
+            cx, cy = _fix_coords((cx, cy))
+            gfxdraw.line(self.surf, px, py, cx, cy, self.path_color)
+            prev = curr
+
+    def _render_items(self, zoom, translation, angle):
         bounds = PLAYFIELD
         field = [
             (bounds, bounds),
@@ -311,14 +353,11 @@ class CarRacing(gym.Env):
             (-bounds, bounds),
         ]
 
-        # draw background
         self._draw_colored_polygon(
             self.surf, field, self.bg_color, zoom, translation, angle, clip=False
         )
 
-        # draw road
         for poly, color in self.obstacles_poly:
-            # converting to pixel coordinates
             poly = [(p[0], p[1]) for p in poly]
             color = [int(c) for c in color]
             self._draw_colored_polygon(self.surf, poly, color, zoom, translation, angle)

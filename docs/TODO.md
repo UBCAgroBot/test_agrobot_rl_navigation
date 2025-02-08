@@ -7,4 +7,9 @@ for environment, bulid up step by step:
 - [x] step 3: implement randomized environments and walls -- REVISIT
 - [x] step 4: implement physics, agent velocity, etc.
 - [x] step 5: implement display
-- [ ] step 6: implement A\* pathfinding
+- [x] step 6: implement A\* pathfinding
+
+next steps:
+
+- need to figure out how to render path without accounting for updating the car position
+- need to figure out how to continuously update car position

@@ -2,7 +2,7 @@ from collections import defaultdict
 import math
 
 
-def a_star_pathfinding(maze: list[list[int]]) -> list[tuple[int, int]]:
+def astar_pathfinding(maze: list[list[int]]) -> list[tuple[int, int]]:
     start_x, start_y = _find_item(1, maze)
     end_x, end_y = _find_item(2, maze)
     parent = _search(maze)
@@ -62,7 +62,6 @@ def _search(maze: list[list[int]]) -> list[list[tuple[int, int]]]:
 
 
 def _backtrack(parent: list[list[tuple[int, int]]], start: tuple[int, int], end: tuple[int, int]) -> list[tuple[int, int]]:
-    print(parent)
     path = []
     current = end
     while current != start:
@@ -86,9 +85,3 @@ def _find_item(value: int, maze: list[list[int]]) -> tuple[int, int]:
             if maze[i][j] == value:
                 return (i, j)
     raise AssertionError("Item Not Found")
-
-
-if __name__ == "__main__":
-    maze = [
-        
-    ]
