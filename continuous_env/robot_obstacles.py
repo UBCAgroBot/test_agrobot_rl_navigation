@@ -37,11 +37,11 @@ MAX_SHAPE_DIM = TILE_DIMS * math.sqrt(2) * ZOOM * SCALE
 
 
 class FrictionDetector(contactListener):
-    def __init__(self, env):
+    def __init__(self, env) -> None:
         contactListener.__init__(self)
         self.env = env
 
-    def BeginContact(self, contact):
+    def BeginContact(self, contact) -> None:
         ret = self._identify_contact_objs(contact)
         if ret:
             obj, tile = ret
@@ -50,7 +50,7 @@ class FrictionDetector(contactListener):
                 self.env.reward += 1000.0
                 self.env.reached_reward = True
 
-    def EndContact(self, contact):
+    def EndContact(self, contact) -> None:
         ret = self._identify_contact_objs(contact)
         if ret:
             obj, tile = ret
@@ -94,12 +94,13 @@ class RobotObstacles(gym.Env):
         self.render_mode = render_mode
         self.verbose = verbose
         self.reward = 0.0
-        self.robot: Optional[Car] = None
+        self.robot: Robot = None
         self.obstacles = []
         self.target = None
         self.is_open = True
         self.clock = None
         self.surf = None
+        self.steps = None
         self.maze = None
         self.maze_updated = None
         self.path = None
@@ -116,7 +117,7 @@ class RobotObstacles(gym.Env):
         )
         self._init_colors()
 
-    def _destroy(self):
+    def _destroy(self) -> None:
         if not self.obstacles:
             return
         for t in self.obstacles:
@@ -127,7 +128,7 @@ class RobotObstacles(gym.Env):
         assert self.robot is not None
         self.robot.destroy()
 
-    def _init_colors(self):
+    def _init_colors(self) -> None:
         self.obs_color = np.array([102, 102, 102])
         self.end_color = np.array([20, 20, 192])
         self.bg_color = np.array([102, 204, 102])
@@ -139,7 +140,7 @@ class RobotObstacles(gym.Env):
         *,
         seed: Optional[int] = None,
         options: Optional[dict] = None,
-    ):
+    ) -> None:
         super().reset(seed=seed)
         self._destroy()
         self._initialize_contact_listener()
@@ -161,6 +162,7 @@ class RobotObstacles(gym.Env):
 
         self.reward = 0.0
         self.t = 0.0
+        self.steps = 0
         self.reached_reward = False
         self.path = []
         self.obstacles_poly = []
@@ -218,6 +220,7 @@ class RobotObstacles(gym.Env):
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
         self.t += 1.0 / FPS
         self.state = self._render("state_pixels")
+        self.steps += 1
 
         x, y = self.robot.hull.position
         nx = int((x + PLAYFIELD - TILE_DIMS / 2) / TILE_DIMS)
@@ -238,6 +241,7 @@ class RobotObstacles(gym.Env):
             # self.reward -=  10 * self.car.fuel_spent / ENGINE_POWER
             self.robot.fuel_spent = 0.0
             if self.reached_reward:
+                step_reward += int(100000 * pow(0.99999995, self.steps))
                 terminated = True
             x, y = self.robot.hull.position
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
@@ -287,7 +291,10 @@ class RobotObstacles(gym.Env):
         trans = (WINDOW_W / 2 + trans[0], WINDOW_H / 4 + trans[1])
 
         self._render_items(zoom, trans, angle)
-        self._render_pathfinding(zoom, trans, angle)
+        try: 
+            self._render_pathfinding(zoom, trans, angle)
+        except:
+            pass
         self.robot.draw(
             self.surf,
             zoom,

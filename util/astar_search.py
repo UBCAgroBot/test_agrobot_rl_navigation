@@ -94,3 +94,4 @@ def _get_h_value(node: tuple[int, int], maze: list[list[int]]) -> float:
     x, y = node
     ix, iy = find_unique_item(maze, 2)
     return math.sqrt((x - ix) ** 2 + (y - iy) ** 2)
+    # return abs(x - ix) + abs(y - iy)
