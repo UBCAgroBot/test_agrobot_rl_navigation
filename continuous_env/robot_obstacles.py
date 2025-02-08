@@ -7,8 +7,9 @@ from typing import Optional, Union
 import numpy as np
 import gymnasium as gym
 from gymnasium import spaces
-from continuous_env.car_dynamics import Car
-from util.astar_search import astar_pathfinding, _find_item
+from continuous_env.robot_dynamics import Robot
+from util.astar_search import astar_pathfinding
+from util.maze_helpers import find_unique_item
 
 import Box2D
 from Box2D.b2 import contactListener, fixtureDef, polygonShape
@@ -16,6 +17,8 @@ import pygame
 from pygame import gfxdraw
 
 from util.maze_generator import maze_generator
+import pstats
+import cProfile
 
 
 STATE_W = 96
@@ -73,7 +76,7 @@ class FrictionDetector(contactListener):
         return obj, tile
 
 
-class CarRacing(gym.Env):
+class RobotObstacles(gym.Env):
     metadata = {
         "render_modes": [
             "human",
@@ -146,11 +149,11 @@ class CarRacing(gym.Env):
             self.render()
         return self.step(None)[0], {}
 
-    def _initialize_contact_listener(self):
+    def _initialize_contact_listener(self) -> None:
         self.world.contactListener_bug_workaround = FrictionDetector(self)
         self.world.contactListener = self.world.contactListener_bug_workaround
 
-    def _reset_environment(self):
+    def _reset_environment(self) -> None:
         self.maze = maze_generator(
             (2 * int(PLAYFIELD / TILE_DIMS), 2 * int(PLAYFIELD / TILE_DIMS))
         )
@@ -170,7 +173,7 @@ class CarRacing(gym.Env):
                     int(y * TILE_DIMS + TILE_DIMS / 2) - PLAYFIELD,
                 )
                 if self.maze[x][y] == 1:
-                    self.robot = Car(self.world, 0, xcoord, ycoord)
+                    self.robot = Robot(self.world, 0, xcoord, ycoord)
                 if self.maze[x][y] == 2:
                     end, end_poly = self._get_tile(xcoord, ycoord, is_end=True)
                     self.target = end
@@ -219,10 +222,10 @@ class CarRacing(gym.Env):
         x, y = self.robot.hull.position
         nx = int((x + PLAYFIELD - TILE_DIMS / 2) / TILE_DIMS)
         ny = int((y + PLAYFIELD - TILE_DIMS / 2) / TILE_DIMS)
-        ox, oy = _find_item(1, self.maze)
+        ox, oy = find_unique_item(self.maze, 1)
         self.maze[ox][oy] = 0
         self.maze[nx][ny] = 1
-        if nx != x or ny != ny:
+        if nx != ox or ny != oy:
             self.maze_updated = True
 
         step_reward = 0
@@ -245,7 +248,7 @@ class CarRacing(gym.Env):
             self.render()
         return self.state, step_reward, terminated, truncated, info
 
-    def render(self):
+    def render(self) -> None:
         if self.render_mode is None:
             assert self.spec is not None
             gym.logger.warn(
@@ -257,7 +260,7 @@ class CarRacing(gym.Env):
         else:
             return self._render(self.render_mode)
 
-    def _render(self, mode: str):
+    def _render(self, mode: str) -> None:
         assert mode in self.metadata["render_modes"]
 
         pygame.font.init()
@@ -284,10 +287,7 @@ class CarRacing(gym.Env):
         trans = (WINDOW_W / 2 + trans[0], WINDOW_H / 4 + trans[1])
 
         self._render_items(zoom, trans, angle)
-        try: 
-            self._render_pathfinding(zoom, trans, angle)
-        except:
-            pass
+        self._render_pathfinding(zoom, trans, angle)
         self.robot.draw(
             self.surf,
             zoom,
@@ -466,7 +466,7 @@ class CarRacing(gym.Env):
             pygame.quit()
 
 
-if __name__ == "__main__":
+def main() -> None:
     a = np.array([0.0, 0.0, 0.0, 0.0])
 
     def register_input():
@@ -503,7 +503,7 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 quit = True
 
-    env = CarRacing(render_mode="human")
+    env = RobotObstacles(render_mode="human")
 
     quit = False
     while not quit:
@@ -522,3 +522,10 @@ if __name__ == "__main__":
             if terminated or truncated or restart or quit:
                 break
     env.close()
+
+
+if __name__ == "__main__":
+    cProfile.run("main()", "profile_output")
+
+    stats = pstats.Stats("profile_output")
+    stats.sort_stats("tottime").print_stats()

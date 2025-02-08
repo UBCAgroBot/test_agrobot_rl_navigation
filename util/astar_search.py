@@ -1,35 +1,52 @@
 from collections import defaultdict
 import math
+from util.maze_helpers import GridTile, find_unique_item, check_in_bounds
+
 
 
 def astar_pathfinding(maze: list[list[int]]) -> list[tuple[int, int]]:
-    start_x, start_y = _find_item(1, maze)
-    end_x, end_y = _find_item(2, maze)
+    """Finds the shortest path in a maze using the A* pathfinding algorithm.
+
+    Args:
+        maze (list[list[int]]): A 2D list representing the maze, where different integers
+                                 represent different types of tiles (e.g., walls, paths).
+
+    Returns:
+        list[tuple[int, int]]: A list of coordinates representing the path from the start
+                                to the end, or an empty list if no path is found.
+    """
+    start_x, start_y = find_unique_item(maze, GridTile.ROBOT.value)
+    end_x, end_y = find_unique_item(maze, GridTile.TARGET.value)
+
     parent = _search(maze)
-    return _backtrack(parent, (start_x, start_y), (end_x, end_y))
+    ret = _backtrack(parent, (start_x, start_y), (end_x, end_y))
+    return ret
 
 
-def _search(maze: list[list[int]]) -> list[list[tuple[int, int]]]:
-    # G is the cost to get to the node
-    # H is the heuristic cost to get to the goal
+def _search(maze: list[list[int]]) -> list[list[tuple[int, int] | None]]:
+    """Performs the A* search algorithm to find the shortest path in the maze.
 
-    def _in_bounds(x: int, y: int) -> bool:
-        return 0 <= x < len(maze) and 0 <= y < len(maze[0])
+    Args:
+        maze (list[list[int]]): A 2D list representing the maze, where different integers
+                                 represent different types of tiles (e.g., walls, paths).
 
-    def _is_walkable(x: int, y: int) -> bool:
-        return maze[x][y] != 3
-
+    Returns:
+        list[list[tuple[int | None, int | None]]]: A 2D list where each cell contains the
+                                                    coordinates of the parent node for each
+                                                    position in the maze, or (None, None) if
+                                                    there is no parent.
+    """
     to_search = set()
     visited = set()
-    g_score = defaultdict(lambda: 1e10)
-    parent = [[None for _ in range(len(maze[0]))] for _ in range(len(maze))]
+    g_score: defaultdict[tuple[int, int], float] = defaultdict(lambda: 1e10)
+    parent: list[list[tuple[int, int] | None]] = [[None for _ in range(len(maze[0]))] for _ in range(len(maze))]
 
-    start_x, start_y = _find_item(1, maze)
+    start_x, start_y = find_unique_item(maze, GridTile.ROBOT.value)
     to_search.add((start_x, start_y))
 
     dirs = [(0, 1), (0, -1), (1, 0), (-1, 0), (1, 1), (1, -1), (-1, 1), (-1, -1)]
     while len(to_search):
-        x, y = None, None
+        x, y = -1, -1
         f_score = 1e12
         for qx, qy in to_search:
             h_value = _get_h_value((qx, qy), maze)
@@ -43,8 +60,8 @@ def _search(maze: list[list[int]]) -> list[list[tuple[int, int]]]:
         for dir in dirs:
             nx, ny = x + dir[0], y + dir[1]
             if (
-                not _in_bounds(nx, ny)
-                or not _is_walkable(nx, ny)
+                not check_in_bounds((nx, ny), (len(maze), len(maze[0])))
+                or maze[nx][ny] == GridTile.WALL.value
                 or (nx, ny) in visited
             ):
                 continue
@@ -61,7 +78,7 @@ def _search(maze: list[list[int]]) -> list[list[tuple[int, int]]]:
     return parent
 
 
-def _backtrack(parent: list[list[tuple[int, int]]], start: tuple[int, int], end: tuple[int, int]) -> list[tuple[int, int]]:
+def _backtrack(parent: list[list[tuple[int | None, int | None]]], start: tuple[int, int], end: tuple[int, int]) -> list[tuple[int, int]]:
     path = []
     current = end
     while current != start:
@@ -75,13 +92,5 @@ def _backtrack(parent: list[list[tuple[int, int]]], start: tuple[int, int], end:
 
 def _get_h_value(node: tuple[int, int], maze: list[list[int]]) -> float:
     x, y = node
-    ix, iy = _find_item(2, maze)
+    ix, iy = find_unique_item(maze, 2)
     return math.sqrt((x - ix) ** 2 + (y - iy) ** 2)
-
-
-def _find_item(value: int, maze: list[list[int]]) -> tuple[int, int]:
-    for i in range(len(maze)):
-        for j in range(len(maze[i])):
-            if maze[i][j] == value:
-                return (i, j)
-    raise AssertionError("Item Not Found")

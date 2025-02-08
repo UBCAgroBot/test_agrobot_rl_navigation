@@ -51,7 +51,7 @@ WHEEL_WHITE = (77, 77, 77)
 MUD_COLOR = (102, 102, 0)
 
 
-class Car:
+class Robot:
     def __init__(self, world, init_angle, init_x, init_y):
         self.world: Box2D.b2World = world
         self.hull: Box2D.b2Body = self.world.CreateDynamicBody(

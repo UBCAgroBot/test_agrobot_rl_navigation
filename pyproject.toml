@@ -48,10 +48,3 @@ warn_unused_configs = true
 disallow_untyped_defs = true
 explicit_package_bases = true
 namespace_packages = true
-
-[tool.poetry]
-packages = [
-    { include = "continuous_env" },
-    { include = "discrete_env" },
-    { include = "util" }
-]
