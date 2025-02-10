@@ -1,24 +1,26 @@
+from __future__ import annotations
 """
 Car racing environment adapted with maze generation and A*, originally from OpenAI Gymnasium
 """
 
 import math
-from typing import Optional, Union
+import pstats
+import cProfile
+from typing import Optional, Union, Any
+
 import numpy as np
+from numpy.typing import NDArray
 import gymnasium as gym
 from gymnasium import spaces
+import pygame
+from pygame import gfxdraw
+import Box2D  # type: ignore
+from Box2D.b2 import contactListener, fixtureDef, polygonShape  # type: ignore
+
 from continuous_env.robot_dynamics import Robot
 from util.astar_search import astar_pathfinding
 from util.maze_helpers import find_unique_item
-
-import Box2D
-from Box2D.b2 import contactListener, fixtureDef, polygonShape
-import pygame
-from pygame import gfxdraw
-
 from util.maze_generator import maze_generator
-import pstats
-import cProfile
 
 
 STATE_W = 96
@@ -36,12 +38,12 @@ ZOOM = 0.3
 MAX_SHAPE_DIM = TILE_DIMS * math.sqrt(2) * ZOOM * SCALE
 
 
-class FrictionDetector(contactListener):
-    def __init__(self, env) -> None:
+class FrictionDetector(contactListener): # type: ignore
+    def __init__(self, env: RobotObstacles) -> None:
         contactListener.__init__(self)
         self.env = env
 
-    def BeginContact(self, contact) -> None:
+    def BeginContact(self, contact: Box2D.Box2D.b2Contact) -> None:
         ret = self._identify_contact_objs(contact)
         if ret:
             obj, tile = ret
@@ -50,19 +52,19 @@ class FrictionDetector(contactListener):
                 self.env.reward += 1000.0
                 self.env.reached_reward = True
 
-    def EndContact(self, contact) -> None:
+    def EndContact(self, contact: Box2D.Box2D.b2Contact) -> None:
         ret = self._identify_contact_objs(contact)
         if ret:
             obj, tile = ret
             obj.tiles.remove(tile)
 
-    def _identify_contact_objs(self, contact):
+    def _identify_contact_objs(self, contact: Box2D.Box2D.b2Contact) -> Optional[tuple[Box2D.Box2D.b2Body, Box2D.Box2D.b2Body]]:
         tile = None
         obj = None
         u1 = contact.fixtureA.body.userData
         u2 = contact.fixtureB.body.userData
         if not u1 or not u2:
-            return False
+            return None
 
         # road friction property is tile, tiles property is car
         if "road_friction" in u1.__dict__ and "tiles" in u2.__dict__:
@@ -72,11 +74,11 @@ class FrictionDetector(contactListener):
             tile = u2
             obj = u1
         else:
-            return False
+            return None
         return obj, tile
 
 
-class RobotObstacles(gym.Env):
+class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
     metadata = {
         "render_modes": [
             "human",
@@ -91,23 +93,23 @@ class RobotObstacles(gym.Env):
         render_mode: Optional[str] = None,
         verbose: bool = False,
     ):
-        self.render_mode = render_mode
-        self.verbose = verbose
-        self.reward = 0.0
-        self.robot: Robot = None
-        self.obstacles = []
-        self.target = None
-        self.is_open = True
-        self.clock = None
-        self.surf = None
-        self.steps = None
-        self.maze = None
-        self.maze_updated = None
-        self.path = None
+        self.render_mode: Optional[str] = render_mode
+        self.verbose: bool = verbose
+        self.reward: float = 0.0
+        self.robot: Optional[Robot] = None
+        self.obstacles: list[Box2D.b2Body] = []
+        self.target: Optional[Box2D.b2Body] = None
+        self.is_open: bool = True
+        self.clock: Optional[pygame.time.Clock] = None
+        self.surf: Optional[pygame.Surface] = None
+        self.steps: Optional[int] = None
+        self.maze: Optional[list[list[int]]] = None
+        self.maze_updated: bool = False
+        self.path: list[tuple[int, int]] = []
         self.screen: Optional[pygame.Surface] = None
 
         self.world = Box2D.b2World((0, 0), contactListener=FrictionDetector(self))
-        self.reached_reward = False
+        self.reached_reward: bool = False
         self.action_space = spaces.Box(
             low=np.array([-1, 0, 0, 0], dtype=np.float32),
             high=np.array([1, 1, 1, 1], dtype=np.float32),
@@ -171,8 +173,8 @@ class RobotObstacles(gym.Env):
         for x in range(len(self.maze)):
             for y in range(len(self.maze[0])):
                 xcoord, ycoord = (
-                    int(x * TILE_DIMS + TILE_DIMS / 2) - PLAYFIELD,
-                    int(y * TILE_DIMS + TILE_DIMS / 2) - PLAYFIELD,
+                    int(x * TILE_DIMS + TILE_DIMS / 2 - PLAYFIELD),
+                    int(y * TILE_DIMS + TILE_DIMS / 2 - PLAYFIELD),
                 )
                 if self.maze[x][y] == 1:
                     self.robot = Robot(self.world, 0, xcoord, ycoord)
@@ -185,7 +187,7 @@ class RobotObstacles(gym.Env):
                     self.obstacles.append(obj)
                     self.obstacles_poly.append(obj_poly)
 
-    def _get_tile(self, x: int, y: int, is_end: bool = False):
+    def _get_tile(self, x: int, y: int, is_end: bool = False) -> tuple[Box2D.Box2D.b2Body, tuple[list[float], NDArray[np.uint]]]:
         t = self.world.CreateStaticBody(position=(x, y))
         t.userData = t
         t.is_end = is_end
@@ -207,7 +209,7 @@ class RobotObstacles(gym.Env):
         poly_info = (vertices, t.color)
         return t, poly_info
 
-    def step(self, action: Union[np.ndarray, int]):
+    def step(self, action: Union[np.ndarray, int]) -> tuple[NDArray[np.uint8], int, bool, bool, dict[str, Any]]:
         assert self.robot is not None
         if action is not None:
             action = action.astype(np.float64)
@@ -234,7 +236,7 @@ class RobotObstacles(gym.Env):
         step_reward = 0
         terminated = False
         truncated = False
-        info = {}
+        info: dict[str, Any] = {}
         if action is not None:  # First step without action, called from reset()
             self.reward -= 0.1
             # We actually don't want to count fuel spent, we want car to be faster.
@@ -328,7 +330,7 @@ class RobotObstacles(gym.Env):
         else:
             return self.isopen
     
-    def _render_pathfinding(self, zoom, translation, angle):
+    def _render_pathfinding(self, zoom, translation, angle) -> None:
         if self.maze_updated:
             self.maze_updated = False
             self.path = astar_pathfinding(self.maze)
@@ -354,7 +356,7 @@ class RobotObstacles(gym.Env):
             gfxdraw.line(self.surf, px, py, cx, cy, self.path_color)
             prev = curr
 
-    def _render_items(self, zoom, translation, angle):
+    def _render_items(self, zoom, translation, angle) -> None:
         bounds = PLAYFIELD
         field = [
             (bounds, bounds),
@@ -534,5 +536,5 @@ def main() -> None:
 if __name__ == "__main__":
     cProfile.run("main()", "profile_output")
 
-    stats = pstats.Stats("profile_output")
-    stats.sort_stats("tottime").print_stats()
+    # stats = pstats.Stats("profile_output")
+    # stats.sort_stats("tottime").print_stats()

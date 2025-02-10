@@ -1,9 +1,17 @@
+# Python cache files
 __pycache__/
 .mypy_cache/
+.ruff_cache/
+
+# Python environment files
 .python-version
+.venv/
 poetry.lock
 
+# Project-specific files
 weights/
-.venv/
-Gymnasium
-/.idea
+checkpoints/
+logs/
+
+# IDE files
+.idea/

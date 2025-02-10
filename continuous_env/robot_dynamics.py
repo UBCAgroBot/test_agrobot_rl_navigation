@@ -361,7 +361,7 @@ class Robot:
             self.particles.pop(0)
         return p
 
-    def destroy(self):
+    def destroy(self) -> None:
         self.world.DestroyBody(self.hull)
         self.hull = None
         for w in self.wheels:
