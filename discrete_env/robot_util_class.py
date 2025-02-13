@@ -1,5 +1,6 @@
-import numpy as np
 from enum import Enum
+
+import numpy as np
 
 
 class RobotActionSpace(Enum):
@@ -16,7 +17,7 @@ class GridTile(Enum):
     WALL = 3
 
 
-_action_space_to_tuple_dict: dict = {
+_action_space_to_tuple_dict: dict[int, tuple[int, int]] = {
     RobotActionSpace.NORTH.value: (-1, 0),
     RobotActionSpace.EAST.value: (0, 1),
     RobotActionSpace.SOUTH.value: (1, 0),
@@ -24,7 +25,7 @@ _action_space_to_tuple_dict: dict = {
 }
 
 
-def _action_space_to_tuple(x: int) -> tuple:
+def _action_space_to_tuple(x: int) -> tuple[int, int]:
     return _action_space_to_tuple_dict[x]
 
 

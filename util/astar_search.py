@@ -1,7 +1,8 @@
-from collections import defaultdict
 import math
-from util.maze_helpers import GridTile, find_unique_item, check_in_bounds
+from collections import defaultdict
+from typing import Optional
 
+from util.maze_helpers import GridTile, check_in_bounds, find_unique_item
 
 
 def astar_pathfinding(maze: list[list[int]]) -> list[tuple[int, int]]:
@@ -23,7 +24,7 @@ def astar_pathfinding(maze: list[list[int]]) -> list[tuple[int, int]]:
     return ret
 
 
-def _search(maze: list[list[int]]) -> list[list[tuple[int, int] | None]]:
+def _search(maze: list[list[int]]) -> list[list[Optional[tuple[int, int]]]]:
     """Performs the A* search algorithm to find the shortest path in the maze.
 
     Args:
@@ -39,7 +40,9 @@ def _search(maze: list[list[int]]) -> list[list[tuple[int, int] | None]]:
     to_search = set()
     visited = set()
     g_score: defaultdict[tuple[int, int], float] = defaultdict(lambda: 1e10)
-    parent: list[list[tuple[int, int] | None]] = [[None for _ in range(len(maze[0]))] for _ in range(len(maze))]
+    parent: list[list[tuple[int, int] | None]] = [
+        [None for _ in range(len(maze[0]))] for _ in range(len(maze))
+    ]
 
     start_x, start_y = find_unique_item(maze, GridTile.ROBOT.value)
     to_search.add((start_x, start_y))
@@ -50,8 +53,10 @@ def _search(maze: list[list[int]]) -> list[list[tuple[int, int] | None]]:
         f_score = 1e12
         for qx, qy in to_search:
             h_value = _get_h_value((qx, qy), maze)
-            new_f_score = h_value + g_score[(qx, qy)] 
-            if new_f_score < f_score or (new_f_score == new_f_score and h_value < _get_h_value((x, y), maze)):
+            new_f_score = h_value + g_score[(qx, qy)]
+            if new_f_score < f_score or (
+                new_f_score == new_f_score and h_value < _get_h_value((x, y), maze)
+            ):
                 x, y = qx, qy
                 f_score = new_f_score
 
@@ -78,14 +83,18 @@ def _search(maze: list[list[int]]) -> list[list[tuple[int, int] | None]]:
     return parent
 
 
-def _backtrack(parent: list[list[tuple[int | None, int | None]]], start: tuple[int, int], end: tuple[int, int]) -> list[tuple[int, int]]:
+def _backtrack(
+    parent: list[list[Optional[tuple[int, int]]]],
+    start: tuple[int, int],
+    end: tuple[int, int],
+) -> list[tuple[int, int]]:
     path = []
     current = end
     while current != start:
         if current is None:
             break
         path.append(current)
-        current = parent[current[0]][current[1]]
+        current = parent[current[0]][current[1]]  # type: ignore
     path.append(start)
     return path[::-1]
 

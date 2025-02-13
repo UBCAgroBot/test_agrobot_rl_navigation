@@ -1,27 +1,28 @@
 from __future__ import annotations
-"""
-Car racing environment adapted with maze generation and A*, originally from OpenAI Gymnasium
-"""
 
 import math
-import pstats
-import cProfile
-from typing import Optional, Union, Any
+from typing import Any, Dict, Optional, Tuple, Union
 
-import numpy as np
-from numpy.typing import NDArray
+import Box2D
 import gymnasium as gym
-from gymnasium import spaces
+import numpy as np
 import pygame
+from Box2D.b2 import contactListener, fixtureDef, polygonShape
+from Box2D.Box2D import b2Body, b2Contact
+from gymnasium import spaces
+from numpy import ndarray
+from numpy.typing import NDArray
 from pygame import gfxdraw
-import Box2D  # type: ignore
-from Box2D.b2 import contactListener, fixtureDef, polygonShape  # type: ignore
+from pygame.surface import Surface
 
 from continuous_env.robot_dynamics import Robot
 from util.astar_search import astar_pathfinding
-from util.maze_helpers import find_unique_item
 from util.maze_generator import maze_generator
+from util.maze_helpers import find_unique_item
 
+"""
+Car racing environment adapted with maze generation and A*, originally from OpenAI Gymnasium
+"""
 
 STATE_W = 96
 STATE_H = 96
@@ -38,12 +39,12 @@ ZOOM = 0.3
 MAX_SHAPE_DIM = TILE_DIMS * math.sqrt(2) * ZOOM * SCALE
 
 
-class FrictionDetector(contactListener): # type: ignore
+class FrictionDetector(contactListener):  # type: ignore
     def __init__(self, env: RobotObstacles) -> None:
         contactListener.__init__(self)
         self.env = env
 
-    def BeginContact(self, contact: Box2D.Box2D.b2Contact) -> None:
+    def BeginContact(self, contact: b2Contact) -> None:
         ret = self._identify_contact_objs(contact)
         if ret:
             obj, tile = ret
@@ -52,13 +53,15 @@ class FrictionDetector(contactListener): # type: ignore
                 self.env.reward += 1000.0
                 self.env.reached_reward = True
 
-    def EndContact(self, contact: Box2D.Box2D.b2Contact) -> None:
+    def EndContact(self, contact: b2Contact) -> None:
         ret = self._identify_contact_objs(contact)
         if ret:
             obj, tile = ret
             obj.tiles.remove(tile)
 
-    def _identify_contact_objs(self, contact: Box2D.Box2D.b2Contact) -> Optional[tuple[Box2D.Box2D.b2Body, Box2D.Box2D.b2Body]]:
+    def _identify_contact_objs(
+        self, contact: b2Contact
+    ) -> Optional[tuple[b2Body, b2Body]]:
         tile = None
         obj = None
         u1 = contact.fixtureA.body.userData
@@ -78,8 +81,8 @@ class FrictionDetector(contactListener): # type: ignore
         return obj, tile
 
 
-class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
-    metadata = {
+class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: ignore
+    metadata: dict[str, Union[list[str], int]] = {
         "render_modes": [
             "human",
             "rgb_array",
@@ -92,7 +95,7 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
         self,
         render_mode: Optional[str] = None,
         verbose: bool = False,
-    ):
+    ) -> None:
         self.render_mode: Optional[str] = render_mode
         self.verbose: bool = verbose
         self.reward: float = 0.0
@@ -141,8 +144,8 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
         self,
         *,
         seed: Optional[int] = None,
-        options: Optional[dict] = None,
-    ) -> None:
+        options: Optional[dict[str, Any]] = None,
+    ) -> tuple[NDArray[np.uint8], Dict[Any, Any]]:
         super().reset(seed=seed)
         self._destroy()
         self._initialize_contact_listener()
@@ -150,7 +153,7 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
 
         if self.render_mode == "human":
             self.render()
-        return self.step(None)[0], {}
+        return self.step()[0], {}
 
     def _initialize_contact_listener(self) -> None:
         self.world.contactListener_bug_workaround = FrictionDetector(self)
@@ -187,7 +190,9 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
                     self.obstacles.append(obj)
                     self.obstacles_poly.append(obj_poly)
 
-    def _get_tile(self, x: int, y: int, is_end: bool = False) -> tuple[Box2D.Box2D.b2Body, tuple[list[float], NDArray[np.uint]]]:
+    def _get_tile(
+        self, x: int, y: int, is_end: bool = False
+    ) -> tuple[Box2D.Box2D.b2Body, tuple[list[tuple[int, int]], NDArray[np.uint]]]:
         t = self.world.CreateStaticBody(position=(x, y))
         t.userData = t
         t.is_end = is_end
@@ -209,8 +214,13 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
         poly_info = (vertices, t.color)
         return t, poly_info
 
-    def step(self, action: Union[np.ndarray, int]) -> tuple[NDArray[np.uint8], int, bool, bool, dict[str, Any]]:
+    def step(
+        self, action: Optional[NDArray[np.float32]] = None
+    ) -> tuple[NDArray[np.uint8], int, bool, bool, dict[str, Any]]:
         assert self.robot is not None
+        assert self.maze is not None
+        assert self.steps is not None
+
         if action is not None:
             action = action.astype(np.float64)
             self.robot.steer(-action[0])
@@ -262,12 +272,13 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
                 "You can specify the render_mode at initialization, "
                 f'e.g. gym.make("{self.spec.id}", render_mode="rgb_array")'
             )
-            return
+            return None
         else:
-            return self._render(self.render_mode)
+            self._render(self.render_mode)
+            return None
 
-    def _render(self, mode: str) -> None:
-        assert mode in self.metadata["render_modes"]
+    def _render(self, mode: str) -> Optional[NDArray[np.uint8]]:
+        assert mode in self.metadata["render_modes"]  # type: ignore
 
         pygame.font.init()
         if self.screen is None and mode == "human":
@@ -278,7 +289,7 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
             self.clock = pygame.time.Clock()
 
         if "t" not in self.__dict__:
-            return  # reset() not called yet
+            return None  # reset() not called yet
 
         self.surf = pygame.Surface((WINDOW_W, WINDOW_H))
 
@@ -289,14 +300,14 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
         zoom = 0.1 * SCALE * max(1 - self.t, 0) + ZOOM * SCALE * min(self.t, 1)
         scroll_x = -(self.robot.hull.position[0]) * zoom
         scroll_y = -(self.robot.hull.position[1]) * zoom
-        trans = pygame.math.Vector2((scroll_x, scroll_y)).rotate_rad(angle)
-        trans = (WINDOW_W / 2 + trans[0], WINDOW_H / 4 + trans[1])
+        trans_vec = pygame.math.Vector2((scroll_x, scroll_y)).rotate_rad(angle)
+        trans = (WINDOW_W / 2 + trans_vec[0], WINDOW_H / 4 + trans_vec[1])
 
         self._render_items(zoom, trans, angle)
-        try: 
+        try:
             self._render_pathfinding(zoom, trans, angle)
-        except:
-            pass
+        except Exception as e:
+            print("Note: exception workaround, ", e)
         self.robot.draw(
             self.surf,
             zoom,
@@ -313,7 +324,7 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
         font = pygame.font.Font(pygame.font.get_default_font(), 42)
         text = font.render("%04i" % self.reward, True, (255, 255, 255), (0, 0, 0))
         text_rect = text.get_rect()
-        text_rect.center = (60, WINDOW_H - WINDOW_H * 2.5 / 40.0)
+        text_rect.center = (60, int(WINDOW_H - WINDOW_H * 2.5 / 40.0))
         self.surf.blit(text, text_rect)
 
         if mode == "human":
@@ -327,20 +338,27 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
             return self._create_image_array(self.surf, (VIDEO_W, VIDEO_H))
         elif mode == "state_pixels":
             return self._create_image_array(self.surf, (STATE_W, STATE_H))
-        else:
-            return self.isopen
-    
-    def _render_pathfinding(self, zoom, translation, angle) -> None:
+
+        return None
+
+    def _render_pathfinding(
+        self, zoom: float, translation: Tuple[float, float], angle: float
+    ) -> None:
+        assert self.maze is not None
+        assert self.surf is not None
         if self.maze_updated:
             self.maze_updated = False
             self.path = astar_pathfinding(self.maze)
-        
-        def _fix_coords(coords: tuple[int, int]): 
-            coords = pygame.math.Vector2(coords).rotate_rad(angle)
-            coords = (coords[0] * zoom + translation[0], coords[1] * zoom + translation[1]) 
-            return int(coords[0]), int(coords[1])
-            
-        def _get_center(x: int, y: int):
+
+        def _fix_coords(coords: tuple[int, int]) -> tuple[int, int]:
+            coords_vec = pygame.math.Vector2(coords).rotate_rad(angle)
+            coords = (
+                int(coords_vec[0] * zoom + translation[0]),
+                int(coords_vec[1] * zoom + translation[1]),
+            )
+            return coords[0], coords[1]
+
+        def _get_center(x: int, y: int) -> tuple[int, int]:
             xcoord, ycoord = (
                 int(x * TILE_DIMS + TILE_DIMS / 2) - PLAYFIELD,
                 int(y * TILE_DIMS + TILE_DIMS / 2) - PLAYFIELD,
@@ -356,7 +374,9 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
             gfxdraw.line(self.surf, px, py, cx, cy, self.path_color)
             prev = curr
 
-    def _render_items(self, zoom, translation, angle) -> None:
+    def _render_items(
+        self, zoom: float, translation: tuple[float, float], angle: float
+    ) -> None:
         bounds = PLAYFIELD
         field = [
             (bounds, bounds),
@@ -370,18 +390,20 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
         )
 
         for poly, color in self.obstacles_poly:
-            poly = [(p[0], p[1]) for p in poly]
+            ret_poly = [(float(p[0]), float(p[1])) for p in poly]
             color = [int(c) for c in color]
-            self._draw_colored_polygon(self.surf, poly, color, zoom, translation, angle)
+            self._draw_colored_polygon(
+                self.surf, ret_poly, color, zoom, translation, angle
+            )
 
-    def _render_indicators(self, W, H):
+    def _render_indicators(self, W: int, H: int) -> None:
         s = W / 40.0
         h = H / 40.0
         color = (0, 0, 0)
         polygon = [(W, H), (W, H - 5 * h), (0, H - 5 * h), (0, H)]
         pygame.draw.polygon(self.surf, color=color, points=polygon)
 
-        def vertical_ind(place, val):
+        def vertical_ind(place: float, val: float) -> list[tuple[float, float]]:
             return [
                 (place * s, H - (h + h * val)),
                 ((place + 1) * s, H - (h + h * val)),
@@ -389,7 +411,7 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
                 ((place + 0) * s, H - h),
             ]
 
-        def horiz_ind(place, val):
+        def horiz_ind(place: float, val: float) -> list[tuple[float, float]]:
             return [
                 ((place + 0) * s, H - 4 * h),
                 ((place + val) * s, H - 4 * h),
@@ -404,7 +426,10 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
         )
 
         # simple wrapper to render if the indicator value is above a threshold
-        def render_if_min(value, points, color):
+        def render_if_min(
+            value: float, points: list[tuple[float, float]], color: tuple[int, int, int]
+        ) -> None:
+            assert self.surf is not None
             if abs(value) > 1e-4:
                 pygame.draw.polygon(self.surf, points=points, color=color)
 
@@ -443,11 +468,20 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
         )
 
     def _draw_colored_polygon(
-        self, surface, poly, color, zoom, translation, angle, clip=True
-    ):
-        poly = [pygame.math.Vector2(c).rotate_rad(angle) for c in poly]
+        self,
+        surface: Optional[Surface],
+        poly: list[tuple[float, float]],
+        color: Union[ndarray, list[int]],
+        zoom: float,
+        translation: tuple[float, float],
+        angle: float,
+        clip: bool = True,
+    ) -> None:
+        assert self.surf is not None
+        poly_vec = [pygame.math.Vector2(c).rotate_rad(angle) for c in poly]
         poly = [
-            (c[0] * zoom + translation[0], c[1] * zoom + translation[1]) for c in poly
+            (c[0] * zoom + translation[0], c[1] * zoom + translation[1])
+            for c in poly_vec
         ]
         # This checks if the polygon is out of bounds of the screen, and we skip drawing if so.
         # Instead of calculating exactly if the polygon and screen overlap,
@@ -462,13 +496,13 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
             gfxdraw.aapolygon(self.surf, poly, color)
             gfxdraw.filled_polygon(self.surf, poly, color)
 
-    def _create_image_array(self, screen, size):
+    def _create_image_array(self, screen: Surface, size: Tuple[int, int]) -> ndarray:
         scaled_screen = pygame.transform.smoothscale(screen, size)
         return np.transpose(
             np.array(pygame.surfarray.pixels3d(scaled_screen)), axes=(1, 0, 2)
         )
 
-    def close(self):
+    def close(self) -> None:
         if self.screen is not None:
             pygame.display.quit()
             self.isopen = False
@@ -477,9 +511,11 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):
 
 def main() -> None:
     a = np.array([0.0, 0.0, 0.0, 0.0])
+    quit: bool = False
+    restart: bool = False
 
-    def register_input():
-        global quit, restart
+    def register_input() -> None:
+        nonlocal quit, restart
         for event in pygame.event.get():
             if event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_LEFT:
@@ -529,12 +565,14 @@ def main() -> None:
                 print(f"step {steps} total_reward {total_reward:+0.2f}")
             steps += 1
             if terminated or truncated or restart or quit:
+                quit = True
                 break
     env.close()
 
 
 if __name__ == "__main__":
-    cProfile.run("main()", "profile_output")
+    main()
+    # cProfile.run("main()", "profile_output")
 
     # stats = pstats.Stats("profile_output")
     # stats.sort_stats("tottime").print_stats()

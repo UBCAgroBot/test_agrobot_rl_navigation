@@ -1,3 +1,14 @@
+import math
+from dataclasses import dataclass
+from typing import Tuple
+
+import Box2D
+import numpy as np
+from Box2D.b2 import fixtureDef, polygonShape, revoluteJointDef
+from Box2D.Box2D import b2World
+from numpy import float64
+from pygame.surface import Surface
+
 """
 Top-down car dynamics simulation.
 
@@ -6,21 +17,6 @@ This simulation is a bit more detailed, with wheels rotation.
 
 Created by Oleg Klimov
 """
-
-import math
-
-import Box2D
-import numpy as np
-
-from gymnasium.error import DependencyNotInstalled
-
-
-try:
-    from Box2D.b2 import fixtureDef, polygonShape, revoluteJointDef
-except ImportError as e:
-    raise DependencyNotInstalled(
-        'Box2D is not installed, you can install it by run `pip install swig` followed by `pip install "gymnasium[box2d]"`'
-    ) from e
 
 
 SIZE = 0.02
@@ -51,8 +47,18 @@ WHEEL_WHITE = (77, 77, 77)
 MUD_COLOR = (102, 102, 0)
 
 
+@dataclass
+class Particle:
+    color: tuple[int, int, int] = (0, 0, 0)
+    ttl: int = 0
+    poly: list[tuple[float, float]] = []
+    grass: bool = False
+
+
 class Robot:
-    def __init__(self, world, init_angle, init_x, init_y):
+    def __init__(
+        self, world: b2World, init_angle: int, init_x: int, init_y: int
+    ) -> None:
         self.world: Box2D.b2World = world
         self.hull: Box2D.b2Body = self.world.CreateDynamicBody(
             position=(init_x, init_y),
@@ -141,9 +147,9 @@ class Robot:
             w.userData = w
             self.wheels.append(w)
         self.drawlist = self.wheels + [self.hull]
-        self.particles = []
+        self.particles: list[Particle] = []
 
-    def gas(self, gas):
+    def gas(self, gas: float64) -> None:
         """control: rear wheel drive
 
         Args:
@@ -156,7 +162,7 @@ class Robot:
                 diff = 0.1  # gradually increase, but stop immediately
             w.gas += diff
 
-    def reverse(self, gas):
+    def reverse(self, gas: float64) -> None:
         gas = np.clip(gas, 0, 1)
         for w in self.wheels[2:4]:
             diff = gas - w.gas
@@ -164,7 +170,7 @@ class Robot:
                 diff = 0.05
             w.gas -= diff
 
-    def brake(self, b):
+    def brake(self, b: float64) -> None:
         """control: brake
 
         Args:
@@ -173,7 +179,7 @@ class Robot:
         for w in self.wheels:
             w.brake = b
 
-    def steer(self, s):
+    def steer(self, s: float64) -> None:
         """control: steer
 
         Args:
@@ -182,7 +188,7 @@ class Robot:
         self.wheels[0].steer = s
         self.wheels[1].steer = s
 
-    def step(self, dt):
+    def step(self, dt: float) -> None:
         for w in self.wheels:
             # Steer each wheel
             dir = np.sign(w.steer - w.joint.angle)
@@ -278,18 +284,25 @@ class Robot:
                 True,
             )
 
-    def draw(self, surface, zoom, translation, angle, draw_particles=True):
+    def draw(
+        self,
+        surface: Surface,
+        zoom: float,
+        translation: Tuple[float, float],
+        angle: float,
+        draw_particles: bool = True,
+    ) -> None:
         import pygame.draw
 
         if draw_particles:
             for p in self.particles:
-                poly = [pygame.math.Vector2(c).rotate_rad(angle) for c in p.poly]
+                vec_poly = [pygame.math.Vector2(c).rotate_rad(angle) for c in p.poly]
                 poly = [
                     (
                         coords[0] * zoom + translation[0],
                         coords[1] * zoom + translation[1],
                     )
-                    for coords in poly
+                    for coords in vec_poly
                 ]
                 pygame.draw.lines(
                     surface, color=p.color, points=poly, width=2, closed=False
@@ -335,7 +348,7 @@ class Robot:
                 white_poly = [trans * v for v in white_poly]
 
                 white_poly = [(coords[0], coords[1]) for coords in white_poly]
-                white_poly = [
+                white_poly_vec = [
                     pygame.math.Vector2(c).rotate_rad(angle) for c in white_poly
                 ]
                 white_poly = [
@@ -343,15 +356,14 @@ class Robot:
                         coords[0] * zoom + translation[0],
                         coords[1] * zoom + translation[1],
                     )
-                    for coords in white_poly
+                    for coords in white_poly_vec
                 ]
                 pygame.draw.polygon(surface, color=WHEEL_WHITE, points=white_poly)
 
-    def _create_particle(self, point1, point2, grass):
-        class Particle:
-            pass
-
-        p = Particle()
+    def _create_particle(
+        self, point1: tuple[float, float], point2: tuple[float, float], grass: bool
+    ) -> Particle:
+        p: Particle = Particle()
         p.color = WHEEL_COLOR if not grass else MUD_COLOR
         p.ttl = 1
         p.poly = [(point1[0], point1[1]), (point2[0], point2[1])]
