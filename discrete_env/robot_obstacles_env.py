@@ -1,13 +1,9 @@
-import numpy as np
-import gymnasium as gym
 from typing import Optional
-from robot_obstacles_class import RobotActionSpace, GridEnv, GridTile
-from robot_util_class import (
-    _import_envs,
-    _action_space_to_tuple_vec,
-    RobotActionSpace,
-    GridTile,
-)
+
+import gymnasium as gym
+import numpy as np
+from robot_obstacles_class import GridEnv, GridTile, RobotActionSpace
+from robot_util_class import GridTile, RobotActionSpace
 
 gym.register(
     id="RobotObstacleEnv-v0",
@@ -84,7 +80,6 @@ class RobotObstacleEnv(gym.Env):
             terminated = True
 
         if self.render_mode == "human":
-            print(action)
             self.render()
 
         return obs, reward, terminated, truncated, info

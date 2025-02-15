@@ -8,8 +8,9 @@ class GridTile(Enum):
     WALL = 3
 
 
-
-def find_unique_item(maze_layout: list[list[int]], item_to_find: int) -> tuple[int, int]:
+def find_unique_item(
+    maze_layout: list[list[int]], item_to_find: int
+) -> tuple[int, int]:
     """Locate the coordinates of a specified item within the maze.
 
     Raises:

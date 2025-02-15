@@ -12,10 +12,7 @@ from pygame.surface import Surface
 """
 Top-down car dynamics simulation.
 
-Some ideas are taken from this great tutorial http://www.iforce2d.net/b2dtut/top-down-car by Chris Campbell.
-This simulation is a bit more detailed, with wheels rotation.
-
-Created by Oleg Klimov
+Created by Oleg Klimov, modified slightly by me.
 """
 
 
@@ -51,7 +48,7 @@ MUD_COLOR = (102, 102, 0)
 class Particle:
     color: tuple[int, int, int] = (0, 0, 0)
     ttl: int = 0
-    poly: list[tuple[float, float]] = []
+    poly: list[tuple[float, float]] = None
     grass: bool = False
 
 
@@ -211,10 +208,6 @@ class Robot:
             vf = forw[0] * v[0] + forw[1] * v[1]  # forward speed
             vs = side[0] * v[0] + side[1] * v[1]  # side speed
 
-            # WHEEL_MOMENT_OF_INERTIA*np.square(w.omega)/2 = E -- energy
-            # WHEEL_MOMENT_OF_INERTIA*w.omega * domega/dt = dE/dt = W -- power
-            # domega = dt*W/WHEEL_MOMENT_OF_INERTIA/w.omega
-
             # add small coef not to divide by zero
             w.omega += (
                 dt
@@ -240,10 +233,6 @@ class Robot:
             f_force = -vf + vr  # force direction is direction of speed difference
             p_force = -vs
 
-            # Physically correct is to always apply friction_limit until speed is equal.
-            # But dt is finite, that will lead to oscillations if difference is already near zero.
-
-            # Random coefficient to cut oscillations in few steps (have no effect on friction_limit)
             f_force *= 205000 * SIZE * SIZE
             p_force *= 205000 * SIZE * SIZE
             force = np.sqrt(np.square(f_force) + np.square(p_force))

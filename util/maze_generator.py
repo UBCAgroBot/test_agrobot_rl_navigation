@@ -1,10 +1,10 @@
-import random
 import bisect
-from discrete_env.robot_util_class import GridTile
-from typing import Any
-from util.maze_helpers import find_unique_item, check_in_bounds
 import copy
+import random
+from typing import Any
 
+from discrete_env.robot_util_class import GridTile
+from util.maze_helpers import check_in_bounds, find_unique_item
 
 DIRS: list[tuple[int, int]] = [(0, 1), (1, 0), (0, -1), (-1, 0)]
 
@@ -21,7 +21,7 @@ def maze_generator(
         smoothness (int, optional): The smoothness of the maze paths. Defaults to 1.
 
     Returns:
-        list[list[int]]: A 2D list representing the generated maze, where 
+        list[list[int]]: A 2D list representing the generated maze, where
                           different integers represent different types of tiles.
     """
     maze = _maze_generator_attempt(dims, min_dist, depth, smoothness)
@@ -34,11 +34,11 @@ def _verify_maze(maze: list[list[int]]) -> bool:
     """Verifies if the maze has a valid path from the robot to the target.
 
     Args:
-        maze (list[list[int]]): A 2D list representing the maze, where 
+        maze (list[list[int]]): A 2D list representing the maze, where
                                  different integers represent different types of tiles.
 
     Returns:
-        bool: True if there is a valid path from the robot to the target, 
+        bool: True if there is a valid path from the robot to the target,
               False otherwise.
     """
     temp_maze = copy.deepcopy(maze)

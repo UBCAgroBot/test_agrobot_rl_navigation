@@ -21,7 +21,8 @@ from util.maze_generator import maze_generator
 from util.maze_helpers import find_unique_item
 
 """
-Car racing environment adapted with maze generation and A*, originally from OpenAI Gymnasium
+Car racing environment adapted with maze generation and A*, originally from
+OpenAI Gymnasium, heavily modified 
 """
 
 STATE_W = 96
@@ -30,7 +31,7 @@ VIDEO_W = 600
 VIDEO_H = 400
 WINDOW_W = 1000
 WINDOW_H = 800
-TILE_DIMS = 20
+TILE_DIMS = 10  # 20 works well
 
 SCALE = 10.0
 PLAYFIELD = 2000 / SCALE
@@ -206,10 +207,10 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
         )
 
         vertices = [
-            (x - int(TILE_DIMS / 2), y - int(TILE_DIMS / 2)),
-            (x + int(TILE_DIMS / 2), y - int(TILE_DIMS / 2)),
-            (x + int(TILE_DIMS / 2), y + int(TILE_DIMS / 2)),
-            (x - int(TILE_DIMS / 2), y + int(TILE_DIMS / 2)),
+            (x - TILE_DIMS / 2, y - TILE_DIMS / 2),
+            (x + TILE_DIMS / 2, y - TILE_DIMS / 2),
+            (x + TILE_DIMS / 2, y + TILE_DIMS / 2),
+            (x - TILE_DIMS / 2, y + TILE_DIMS / 2),
         ]
         poly_info = (vertices, t.color)
         return t, poly_info
@@ -220,6 +221,11 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
         assert self.robot is not None
         assert self.maze is not None
         assert self.steps is not None
+
+        render_dict = [".", "P", "T", "#", "X"]
+
+        def render_maze(maze: list[list[float]]) -> list[str]:
+            return ["".join([render_dict[y] for y in row]) for row in maze]
 
         if action is not None:
             action = action.astype(np.float64)
@@ -249,8 +255,6 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
         info: dict[str, Any] = {}
         if action is not None:  # First step without action, called from reset()
             self.reward -= 0.1
-            # We actually don't want to count fuel spent, we want car to be faster.
-            # self.reward -=  10 * self.car.fuel_spent / ENGINE_POWER
             self.robot.fuel_spent = 0.0
             if self.reached_reward:
                 step_reward += int(100000 * pow(0.99999995, self.steps))
@@ -346,9 +350,6 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
     ) -> None:
         assert self.maze is not None
         assert self.surf is not None
-        if self.maze_updated:
-            self.maze_updated = False
-            self.path = astar_pathfinding(self.maze)
 
         def _fix_coords(coords: tuple[int, int]) -> tuple[int, int]:
             coords_vec = pygame.math.Vector2(coords).rotate_rad(angle)
@@ -365,12 +366,18 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
             )
             return int(xcoord), int(ycoord)
 
-        prev = self.path[0]
-        for curr in self.path[1:]:
-            px, py = _get_center(*prev)
-            cx, cy = _get_center(*curr)
-            px, py = _fix_coords((px, py))
-            cx, cy = _fix_coords((cx, cy))
+        if self.maze_updated:
+            self.maze_updated = False
+            self.path = astar_pathfinding(self.maze)
+        render_path = [_fix_coords(_get_center(*x)) for x in self.path]
+
+        robot_x, robot_y = _fix_coords(
+            (int(self.robot.hull.position[0]), (self.robot.hull.position[1]))
+        )
+        prev = (robot_x, robot_y)
+        for curr in render_path:
+            px, py = prev
+            cx, cy = curr
             gfxdraw.line(self.surf, px, py, cx, cy, self.path_color)
             prev = curr
 
@@ -483,11 +490,6 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
             (c[0] * zoom + translation[0], c[1] * zoom + translation[1])
             for c in poly_vec
         ]
-        # This checks if the polygon is out of bounds of the screen, and we skip drawing if so.
-        # Instead of calculating exactly if the polygon and screen overlap,
-        # we simply check if the polygon is in a larger bounding box whose dimension
-        # is greater than the screen by MAX_SHAPE_DIM, which is the maximum
-        # diagonal length of an environment object
         if not clip or any(
             (-MAX_SHAPE_DIM <= coord[0] <= WINDOW_W + MAX_SHAPE_DIM)
             and (-MAX_SHAPE_DIM <= coord[1] <= WINDOW_H + MAX_SHAPE_DIM)
