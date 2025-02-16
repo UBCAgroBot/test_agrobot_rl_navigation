@@ -193,7 +193,7 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
 
     def _get_tile(
         self, x: int, y: int, is_end: bool = False
-    ) -> tuple[Box2D.Box2D.b2Body, tuple[list[tuple[int, int]], NDArray[np.uint]]]:
+    ) -> tuple[Box2D.Box2D.b2Body, tuple[list[tuple[float, float]], NDArray[np.uint]]]:
         t = self.world.CreateStaticBody(position=(x, y))
         t.userData = t
         t.is_end = is_end
@@ -221,11 +221,6 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
         assert self.robot is not None
         assert self.maze is not None
         assert self.steps is not None
-
-        render_dict = [".", "P", "T", "#", "X"]
-
-        def render_maze(maze: list[list[float]]) -> list[str]:
-            return ["".join([render_dict[y] for y in row]) for row in maze]
 
         if action is not None:
             action = action.astype(np.float64)
@@ -350,6 +345,7 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
     ) -> None:
         assert self.maze is not None
         assert self.surf is not None
+        assert self.robot is not None
 
         def _fix_coords(coords: tuple[int, int]) -> tuple[int, int]:
             coords_vec = pygame.math.Vector2(coords).rotate_rad(angle)

@@ -1,6 +1,6 @@
 import math
 from dataclasses import dataclass
-from typing import Tuple
+from typing import Optional, Tuple
 
 import Box2D
 import numpy as np
@@ -48,7 +48,7 @@ MUD_COLOR = (102, 102, 0)
 class Particle:
     color: tuple[int, int, int] = (0, 0, 0)
     ttl: int = 0
-    poly: list[tuple[float, float]] = None
+    poly: Optional[list[tuple[float, float]]] = None
     grass: bool = False
 
 
@@ -285,6 +285,7 @@ class Robot:
 
         if draw_particles:
             for p in self.particles:
+                assert p.poly is not None
                 vec_poly = [pygame.math.Vector2(c).rotate_rad(angle) for c in p.poly]
                 poly = [
                     (

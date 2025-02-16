@@ -12,14 +12,13 @@ for environment, bulid up step by step:
 # next steps:
 
 - [x] refactoring + mypy + docstrings
+- [x] bug: fix A\* rendering, sometimes it will disappear
+- [x] bug: fix A\* pathfinding, sometimes will be diagonal when straight is better
+- [ ] need to pixelize the map more -- make blocks smaller
+- [ ] improvement: make map generation better
+- [ ] bug: fix A\* pathfinding, sometimes will suggest going through wall (diagonal)
+- [ ] bug: when scale = 30, experiment with scale
+
 - [ ] need to figure out how to render path without accounting for updating the car position
 - [ ] need to figure out how to continuously update car position
-- [ ] need to pixelize the map more -- make blocks smaller
-- [ ] bug: fix A\* pathfinding, sometimes will suggest going through wall (diagonal)
-- [ ] bug: fix A\* rendering, sometimes it will disappear
-- [ ] improvement: make map generation better
-
-- [ ] bug: fix A\* pathfinding, sometimes will be diagonal when straight is better
 - [ ] bug: fix A\* pathfinding, sometimes it will override wall
-
-# TODO: bug when scale = 30, experiment with scale
