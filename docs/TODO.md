@@ -14,6 +14,7 @@ for environment, bulid up step by step:
 - [x] refactoring + mypy + docstrings
 - [x] bug: fix A\* rendering, sometimes it will disappear
 - [x] bug: fix A\* pathfinding, sometimes will be diagonal when straight is better
+
 - [ ] need to pixelize the map more -- make blocks smaller
 - [ ] improvement: make map generation better
 - [ ] bug: fix A\* pathfinding, sometimes will suggest going through wall (diagonal)
