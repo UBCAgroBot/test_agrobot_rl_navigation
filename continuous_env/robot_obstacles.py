@@ -31,9 +31,9 @@ VIDEO_W = 600
 VIDEO_H = 400
 WINDOW_W = 1000
 WINDOW_H = 800
-TILE_DIMS = 5  # 20 works well
+TILE_DIMS = 20  # 20 works well
 
-SCALE = 10.0
+SCALE = 10.0  # 10 works well
 PLAYFIELD = 2000 / SCALE
 FPS = 50
 ZOOM = 0.3

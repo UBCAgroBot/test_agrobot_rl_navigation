@@ -19,6 +19,7 @@ for environment, bulid up step by step:
 - [ ] improvement: make map generation better
 - [ ] bug: fix A\* pathfinding, sometimes will suggest going through wall (diagonal)
 - [ ] bug: when scale = 30, experiment with scale
+- [ ] bug: car position is not correct
 
 - [ ] need to figure out how to render path without accounting for updating the car position
 - [ ] need to figure out how to continuously update car position
