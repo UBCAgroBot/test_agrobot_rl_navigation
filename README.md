@@ -4,6 +4,33 @@ A custom OpenAI Gymnasium environment for robot navigation through procedurally 
 
 Credits: the continuous environment includes heavily modified files originally from OpenAI Gymnasium CarRacing Environment
 
+## Installation
+
+To install the required dependencies for the Robot Navigation Environment, follow these steps:
+
+1. Ensure you have Python 3.11 installed on your system.
+2. Clone the repository:
+    ```sh
+    git clone https://github.com/yourusername/robot-navigation-env.git
+    cd robot-navigation-env
+    ```
+3. If you have CUDA and GPU acceleration, uncomment the `tool.poetry.source` and `tool.poetry.dependencies` sections in the `pyproject.toml` file:
+    ```toml
+    # [[tool.poetry.source]]
+    # name = "pytorch-gpu"
+    # url = "https://download.pytorch.org/whl/cu126"
+    # priority = "explicit"
+
+    # [tool.poetry.dependencies]
+    # torch = {source = "pytorch-gpu"}
+    # torchvision = {source = "pytorch-gpu"}
+    # torchaudio = {source = "pytorch-gpu"}
+    ```
+4. Install the dependencies using Poetry:
+    ```sh
+    make build
+    ```
+
 ## Features
 
 - **Maze Generation**: Procedurally generated mazes with configurable parameters

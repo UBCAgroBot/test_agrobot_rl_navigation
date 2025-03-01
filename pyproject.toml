@@ -19,16 +19,16 @@ dependencies = [
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
 
-[[tool.poetry.source]]
-name = "pytorch-gpu"
-url = "https://download.pytorch.org/whl/cu126"
-priority = "explicit"
+# [[tool.poetry.source]]
+# name = "pytorch-gpu"
+# url = "https://download.pytorch.org/whl/cu126"
+# priority = "explicit"
 
 
-[tool.poetry.dependencies]
-torch = {source = "pytorch-gpu"}
-torchvision = {source = "pytorch-gpu"}
-torchaudio = {source = "pytorch-gpu"}
+# [tool.poetry.dependencies]
+# torch = {source = "pytorch-gpu"}
+# torchvision = {source = "pytorch-gpu"}
+# torchaudio = {source = "pytorch-gpu"}
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^4.1.0"
