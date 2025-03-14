@@ -1,8 +1,8 @@
-from typing import Optional
+from typing import Any, Optional
 
 import gymnasium as gym
 import numpy as np
-from robot_obstacles_class import GridEnv, GridTile, RobotActionSpace
+from robot_obstacles_class import GridEnv
 from robot_util_class import GridTile, RobotActionSpace
 
 gym.register(
@@ -11,10 +11,12 @@ gym.register(
 )
 
 
-class RobotObstacleEnv(gym.Env):
+class RobotObstacleEnv(gym.Env):  # type: ignore[misc]
     metadata = {"render_modes": ["human"], "render_fps": 1}
 
-    def __init__(self, discount=0.9995, render_mode=None) -> None:
+    def __init__(
+        self, discount: float = 0.9995, render_mode: Optional[str] = None
+    ) -> None:
         self.robot_grid_env = GridEnv(size=6)
         self.render_mode = render_mode
         self.steps: int = 0
@@ -40,7 +42,7 @@ class RobotObstacleEnv(gym.Env):
             }
         )
 
-    def _get_obs(self) -> dict:
+    def _get_obs(self) -> dict[str, Any]:
         def _from_grid_tile(x: GridTile) -> np.uint8:
             return np.uint8(x.value)
 
@@ -51,28 +53,30 @@ class RobotObstacleEnv(gym.Env):
         }
 
     def reset(
-        self, seed: Optional[int] = None, options: Optional[dict] = None
-    ) -> tuple[dict, dict]:
+        self, seed: Optional[int] = None, options: Optional[dict[str, Any]] = None
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
         super().reset(seed=seed)
         self.robot_grid_env.reset()
         self.steps = 0
 
-        obs: dict = self._get_obs()
-        info: dict = {}
+        obs: dict[str, Any] = self._get_obs()
+        info: dict[str, Any] = {}
 
         if self.render_mode == "human":
             self.render()
 
         return obs, info
 
-    def step(self, action: int) -> tuple[dict, float, bool, bool, dict]:
+    def step(
+        self, action: int
+    ) -> tuple[dict[str, Any], float, bool, bool, dict[str, Any]]:
         self.robot_grid_env.move(action=action)
 
-        reward = 0
+        reward: float = 0
         terminated = False
         truncated = False
-        info: dict = {}
-        obs: dict = self._get_obs()
+        info: dict[str, Any] = {}
+        obs: dict[str, Any] = self._get_obs()
 
         self.steps += 1
         if self.robot_grid_env.is_won():
@@ -94,18 +98,3 @@ _action_to_directions = {
     2: RobotActionSpace.SOUTH,
     3: RobotActionSpace.WEST,
 }
-
-if __name__ == "__main__":
-    env = gym.make("RobotObstacleEnv-v0", render_mode="human")
-    env.reset()
-
-    for tstep in range(40):
-        # rand_action = env.action_space.sample()
-        rand_action = int(input())
-
-        obs, reward, terminated, _, _ = env.step(_action_to_directions[rand_action])
-        env.render()
-        print()
-
-        if terminated:
-            obs, _ = env.reset()
