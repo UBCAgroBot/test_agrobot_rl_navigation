@@ -1,13 +1,7 @@
-from enum import Enum
-import random
 import numpy as np
+from robot_util_class import GridTile, _action_space_to_tuple_vec, _import_envs
+
 from util.maze_generator import maze_generator
-from robot_util_class import (
-    _import_envs,
-    _action_space_to_tuple_vec,
-    RobotActionSpace,
-    GridTile,
-)
 
 
 class GridEnv:
@@ -15,12 +9,12 @@ class GridEnv:
         self.env_orig = _import_envs(maze_generator((size, size)))
         self.size = size
         self.env_space: np.ndarray
-        self.robot_pos: tuple
-        self.target_pos: tuple
+        self.robot_pos: tuple[int, int]
+        self.target_pos: tuple[int, int]
         self.reset()
 
     def move(self, action: int) -> bool:
-        new_robot_pos: tuple = tuple(
+        new_robot_pos: tuple[int, int] = tuple(
             a + b for a, b in zip(self.robot_pos, _action_space_to_tuple_vec(action))
         )
         if (
@@ -54,15 +48,3 @@ class GridEnv:
         if len(pos) > 0:
             return tuple(pos[0])
         raise ValueError("Item Not Found")
-
-
-if __name__ == "__main__":
-    env = GridEnv(env=_import_envs(EXAMPLE_ENV))
-    env.render()
-
-    for i in range(25):
-        rand_action = random.choice(list(RobotActionSpace))
-        print("\n", rand_action)
-
-        env.move(rand_action)
-        env.render()
