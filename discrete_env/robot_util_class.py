@@ -1,6 +1,7 @@
 from enum import Enum
 
 import numpy as np
+from numpy.typing import NDArray
 
 
 class RobotActionSpace(Enum):
@@ -32,7 +33,7 @@ def _action_space_to_tuple(x: int) -> tuple[int, int]:
 _action_space_to_tuple_vec = np.vectorize(_action_space_to_tuple)
 
 
-def _import_envs(env: list[list[int]]) -> np.ndarray:
+def _import_envs(env: list[list[int]]) -> NDArray[np.int32]:
     new_env: list[list[GridTile]] = [[] for _ in range(len(env))]
     for i in range(len(env)):
         new_env[i] = [GridTile(j) for j in env[i]]

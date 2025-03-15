@@ -20,5 +20,5 @@ jobs:
           make build
       - name: Analysing the code with black
         run: |
-          isort --profile black .
+          poetry run isort --profile black .
           poetry run black .

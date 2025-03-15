@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, Optional, Tuple, Union
+from typing import Any, Dict, Optional, Tuple, Union, cast
 
 import Box2D
 import gymnasium as gym
@@ -10,7 +10,6 @@ import pygame
 from Box2D.b2 import contactListener, fixtureDef, polygonShape
 from Box2D.Box2D import b2Body, b2Contact
 from gymnasium import spaces
-from numpy import ndarray
 from numpy.typing import NDArray
 from pygame import gfxdraw
 from pygame.surface import Surface
@@ -35,7 +34,7 @@ TILE_DIMS = 20  # 20 works well
 
 SCALE = 10.0  # 10 works well
 PLAYFIELD = 2000 / SCALE
-FPS = 50
+FPS = 50.0
 ZOOM = 0.3
 MAX_SHAPE_DIM = TILE_DIMS * math.sqrt(2) * ZOOM * SCALE
 
@@ -82,8 +81,8 @@ class FrictionDetector(contactListener):  # type: ignore
         return obj, tile
 
 
-class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: ignore
-    metadata: dict[str, Union[list[str], int]] = {
+class RobotObstacles(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
+    metadata: dict[str, Union[list[str], float]] = {
         "render_modes": [
             "human",
             "rgb_array",
@@ -135,18 +134,18 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
         self.robot.destroy()
 
     def _init_colors(self) -> None:
-        self.obs_color = np.array([102, 102, 102])
-        self.end_color = np.array([20, 20, 192])
-        self.bg_color = np.array([102, 204, 102])
-        self.grass_color = np.array([102, 230, 102])
-        self.path_color = np.array([230, 230, 230])
+        self.obs_color = np.array([102, 102, 102], dtype=np.int32)
+        self.end_color = np.array([20, 20, 192], dtype=np.int32)
+        self.bg_color = np.array([102, 204, 102], dtype=np.int32)
+        self.grass_color = np.array([102, 230, 102], dtype=np.int32)
+        self.path_color = np.array([230, 230, 230], dtype=np.int32)
 
     def reset(
         self,
         *,
         seed: Optional[int] = None,
         options: Optional[dict[str, Any]] = None,
-    ) -> tuple[NDArray[np.uint8], Dict[Any, Any]]:
+    ) -> tuple[NDArray[np.float32], Dict[Any, Any]]:
         super().reset(seed=seed)
         self._destroy()
         self._initialize_contact_listener()
@@ -193,7 +192,9 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
 
     def _get_tile(
         self, x: int, y: int, is_end: bool = False
-    ) -> tuple[Box2D.Box2D.b2Body, tuple[list[tuple[float, float]], NDArray[np.uint]]]:
+    ) -> tuple[
+        Box2D.Box2D.b2Body, tuple[list[tuple[float, float]], NDArray[np.float32]]
+    ]:
         t = self.world.CreateStaticBody(position=(x, y))
         t.userData = t
         t.is_end = is_end
@@ -212,12 +213,13 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
             (x + TILE_DIMS / 2, y + TILE_DIMS / 2),
             (x - TILE_DIMS / 2, y + TILE_DIMS / 2),
         ]
-        poly_info = (vertices, t.color)
+        float_color = t.color.astype(np.float32)
+        poly_info = (vertices, float_color)
         return t, poly_info
 
     def step(
         self, action: Optional[NDArray[np.float32]] = None
-    ) -> tuple[NDArray[np.uint8], int, bool, bool, dict[str, Any]]:
+    ) -> tuple[NDArray[np.float32], int, bool, bool, dict[str, Any]]:
         assert self.robot is not None
         assert self.maze is not None
         assert self.steps is not None
@@ -233,6 +235,8 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
         self.world.Step(1.0 / FPS, 6 * 30, 2 * 30)
         self.t += 1.0 / FPS
         self.state = self._render("state_pixels")
+        if self.state is None:
+            self.state = np.zeros((STATE_H, STATE_W, 3), dtype=np.float32)
         self.steps += 1
 
         x, y = self.robot.hull.position
@@ -276,7 +280,7 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
             self._render(self.render_mode)
             return None
 
-    def _render(self, mode: str) -> Optional[NDArray[np.uint8]]:
+    def _render(self, mode: str) -> Optional[NDArray[np.float32]]:
         assert mode in self.metadata["render_modes"]  # type: ignore
 
         pygame.font.init()
@@ -328,7 +332,7 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
 
         if mode == "human":
             pygame.event.pump()
-            self.clock.tick(self.metadata["render_fps"])
+            self.clock.tick(cast(float, self.metadata["render_fps"]))
             assert self.screen is not None
             self.screen.fill(0)
             self.screen.blit(self.surf, (0, 0))
@@ -374,7 +378,9 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
         for curr in render_path:
             px, py = prev
             cx, cy = curr
-            gfxdraw.line(self.surf, px, py, cx, cy, self.path_color)
+            gfxdraw.line(
+                self.surf, px, py, cx, cy, cast(list[int], self.path_color.tolist())
+            )
             prev = curr
 
     def _render_items(
@@ -389,17 +395,24 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
         ]
 
         self._draw_colored_polygon(
-            self.surf, field, self.bg_color, zoom, translation, angle, clip=False
+            self.surf,
+            field,
+            cast(list[int], self.bg_color.tolist()),
+            zoom,
+            translation,
+            angle,
+            clip=False,
         )
 
         for poly, color in self.obstacles_poly:
             ret_poly = [(float(p[0]), float(p[1])) for p in poly]
-            color = [int(c) for c in color]
             self._draw_colored_polygon(
-                self.surf, ret_poly, color, zoom, translation, angle
+                self.surf, ret_poly, [int(c) for c in color], zoom, translation, angle
             )
 
     def _render_indicators(self, W: int, H: int) -> None:
+        assert self.surf
+
         s = W / 40.0
         h = H / 40.0
         color = (0, 0, 0)
@@ -474,7 +487,7 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
         self,
         surface: Optional[Surface],
         poly: list[tuple[float, float]],
-        color: Union[ndarray, list[int]],
+        color: list[int],
         zoom: float,
         translation: tuple[float, float],
         angle: float,
@@ -494,7 +507,9 @@ class RobotObstacles(gym.Env[NDArray[np.uint8], NDArray[np.float32]]):  # type: 
             gfxdraw.aapolygon(self.surf, poly, color)
             gfxdraw.filled_polygon(self.surf, poly, color)
 
-    def _create_image_array(self, screen: Surface, size: Tuple[int, int]) -> ndarray:
+    def _create_image_array(
+        self, screen: Surface, size: Tuple[int, int]
+    ) -> NDArray[np.float32]:
         scaled_screen = pygame.transform.smoothscale(screen, size)
         return np.transpose(
             np.array(pygame.surfarray.pixels3d(scaled_screen)), axes=(1, 0, 2)

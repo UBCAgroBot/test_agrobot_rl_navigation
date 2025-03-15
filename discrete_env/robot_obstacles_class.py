@@ -1,6 +1,11 @@
 import numpy as np
-from robot_util_class import GridTile, _action_space_to_tuple_vec, _import_envs
+from numpy.typing import NDArray
 
+from discrete_env.robot_util_class import (
+    GridTile,
+    _action_space_to_tuple_vec,
+    _import_envs,
+)
 from util.maze_generator import maze_generator
 
 
@@ -8,7 +13,7 @@ class GridEnv:
     def __init__(self, size: int) -> None:
         self.env_orig = _import_envs(maze_generator((size, size)))
         self.size = size
-        self.env_space: np.ndarray
+        self.env_space: NDArray[np.int32]
         self.robot_pos: tuple[int, int]
         self.target_pos: tuple[int, int]
         self.reset()
@@ -19,10 +24,10 @@ class GridEnv:
         )
         if (
             self._is_in_bounds(new_robot_pos)
-            and self.env_space[new_robot_pos] != GridTile.WALL
+            and self.env_space[new_robot_pos] != GridTile.WALL.value
         ):
-            self.env_space[self.robot_pos] = GridTile.FLOOR
-            self.env_space[new_robot_pos] = GridTile.ROBOT
+            self.env_space[self.robot_pos] = GridTile.FLOOR.value
+            self.env_space[new_robot_pos] = GridTile.ROBOT.value
             self.robot_pos = new_robot_pos
             return True
         return False

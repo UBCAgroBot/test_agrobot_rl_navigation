@@ -9,6 +9,7 @@ repos:
     rev: v1.8.0
     hooks:
       - id: mypy
+        language: system
         additional_dependencies: []
 
   - repo: https://github.com/yunojuno/pre-commit-xenon

@@ -2,8 +2,11 @@ from typing import Any, Optional
 
 import gymnasium as gym
 import numpy as np
-from robot_obstacles_class import GridEnv
-from robot_util_class import GridTile, RobotActionSpace
+from gymnasium.spaces import Discrete
+from numpy.typing import NDArray
+
+from discrete_env.robot_obstacles_class import GridEnv
+from discrete_env.robot_util_class import GridTile, RobotActionSpace
 
 gym.register(
     id="RobotObstacleEnv-v0",
@@ -11,7 +14,7 @@ gym.register(
 )
 
 
-class RobotObstacleEnv(gym.Env):  # type: ignore[misc]
+class RobotObstacles(gym.Env[dict[str, NDArray[np.uint8]], int]):
     metadata = {"render_modes": ["human"], "render_fps": 1}
 
     def __init__(
@@ -22,7 +25,7 @@ class RobotObstacleEnv(gym.Env):  # type: ignore[misc]
         self.steps: int = 0
         self.discount: float = discount
 
-        self.action_space = gym.spaces.Discrete(len(RobotActionSpace))
+        self.action_space = Discrete(len(RobotActionSpace))  # type: ignore
         self.observation_space = gym.spaces.Dict(
             {
                 "space": gym.spaces.Box(
