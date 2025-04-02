@@ -240,8 +240,9 @@ class RobotObstacles(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.steps += 1
 
         x, y = self.robot.hull.position
-        nx = int((x + PLAYFIELD - TILE_DIMS / 2) / TILE_DIMS)
-        ny = int((y + PLAYFIELD - TILE_DIMS / 2) / TILE_DIMS)
+        nx = int(round((x + PLAYFIELD - TILE_DIMS * 1.0 / 2) * 1.0 / TILE_DIMS))
+        ny = int(round((y + PLAYFIELD - TILE_DIMS * 1.0 / 2) * 1.0 / TILE_DIMS))
+
         ox, oy = find_unique_item(self.maze, 1)
         self.maze[ox][oy] = 0
         self.maze[nx][ny] = 1
