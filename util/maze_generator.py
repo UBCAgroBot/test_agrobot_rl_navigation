@@ -24,9 +24,27 @@ def maze_generator(
         list[list[int]]: A 2D list representing the generated maze, where
                           different integers represent different types of tiles.
     """
-    maze = _maze_generator_attempt(dims, min_dist, depth, smoothness)
-    while _verify_maze(maze):
-        maze = _maze_generator_attempt(dims, min_dist, depth, smoothness)
+    # maze = _maze_generator_attempt(dims, min_dist, depth, smoothness)
+    # while _verify_maze(maze):
+    #     maze = _maze_generator_attempt(dims, min_dist, depth, smoothness)
+
+    width, height = dims
+    maze: list[list[int]] = [
+        [GridTile.FLOOR.value for _ in range(height)] for _ in range(width)
+    ]
+
+    robot_x = random.randint(0, width - 1)
+    robot_y = random.randint(0, height - 1)
+    maze[robot_x][robot_y] = GridTile.ROBOT.value
+
+    target_x = random.randint(0, width - 1)
+    target_y = random.randint(0, height - 1)
+
+    while target_x == robot_x and target_y == robot_y:
+        target_x = random.randint(0, width - 1)
+        target_y = random.randint(0, height - 1)
+
+    maze[target_x][target_y] = GridTile.TARGET.value
     return maze
 
 

@@ -32,10 +32,10 @@ WINDOW_W = 1000
 WINDOW_H = 800
 TILE_DIMS = 20  # 20 works well
 
-SCALE = 10.0  # 10 works well
+SCALE = 20.0  # 10 works well
 PLAYFIELD = 2000 / SCALE
 FPS = 50.0
-ZOOM = 0.3
+ZOOM = 0.15
 MAX_SHAPE_DIM = TILE_DIMS * math.sqrt(2) * ZOOM * SCALE
 
 
@@ -95,6 +95,7 @@ class RobotObstacles(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         self,
         render_mode: Optional[str] = None,
         verbose: bool = False,
+        grayscale: bool = True,
     ) -> None:
         self.render_mode: Optional[str] = render_mode
         self.verbose: bool = verbose
@@ -110,6 +111,7 @@ class RobotObstacles(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.maze_updated: bool = False
         self.path: list[tuple[int, int]] = []
         self.screen: Optional[pygame.Surface] = None
+        self.grayscale: bool = grayscale
 
         self.world = Box2D.b2World((0, 0), contactListener=FrictionDetector(self))
         self.reached_reward: bool = False
@@ -139,6 +141,12 @@ class RobotObstacles(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         self.bg_color = np.array([102, 204, 102], dtype=np.int32)
         self.grass_color = np.array([102, 230, 102], dtype=np.int32)
         self.path_color = np.array([230, 230, 230], dtype=np.int32)
+        if self.grayscale:
+            self.obs_color = np.array([102, 102, 102], dtype=np.int32)
+            self.end_color = np.array([64, 64, 64], dtype=np.int32)
+            self.bg_color = np.array([158, 158, 158], dtype=np.int32)
+            self.grass_color = np.array([173, 173, 173], dtype=np.int32)
+            self.path_color = np.array([230, 230, 230], dtype=np.int32)
 
     def reset(
         self,
@@ -242,6 +250,8 @@ class RobotObstacles(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         x, y = self.robot.hull.position
         nx = int(round((x + PLAYFIELD - TILE_DIMS * 1.0 / 2) * 1.0 / TILE_DIMS))
         ny = int(round((y + PLAYFIELD - TILE_DIMS * 1.0 / 2) * 1.0 / TILE_DIMS))
+        nx = max(0, min(nx, len(self.maze) - 1))
+        ny = max(0, min(ny, len(self.maze[0]) - 1))
 
         ox, oy = find_unique_item(self.maze, 1)
         self.maze[ox][oy] = 0
@@ -254,16 +264,17 @@ class RobotObstacles(gym.Env[NDArray[np.float32], NDArray[np.float32]]):
         truncated = False
         info: dict[str, Any] = {}
         if action is not None:  # First step without action, called from reset()
-            self.reward -= 0.1
+            self.reward -= 10
             self.robot.fuel_spent = 0.0
             if self.reached_reward:
-                step_reward += int(100000 * pow(0.99999995, self.steps))
+                step_reward += int(100000 * pow(0.995, self.steps))
                 terminated = True
             x, y = self.robot.hull.position
             if abs(x) > PLAYFIELD or abs(y) > PLAYFIELD:
                 terminated = True
                 step_reward = -100
 
+        step_reward = max(-100, min(step_reward, 10000))
         if self.render_mode == "human":
             self.render()
         return self.state, step_reward, terminated, truncated, info
@@ -586,7 +597,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-    # cProfile.run("main()", "profile_output")
-
-    # stats = pstats.Stats("profile_output")
-    # stats.sort_stats("tottime").print_stats()

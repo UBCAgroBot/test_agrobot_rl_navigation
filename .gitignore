@@ -11,6 +11,7 @@ poetry.lock
 # Project-specific files
 weights/
 checkpoints/
+checkpoints_/
 logs/
 
 # IDE files
